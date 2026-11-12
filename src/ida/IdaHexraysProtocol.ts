@@ -22,7 +22,6 @@ export const openDatabaseResultSchema = z
     hint: z.string().nullish(),
   })
   .passthrough();
-export type OpenDatabaseResult = z.infer<typeof openDatabaseResultSchema>;
 
 /** One `list_databases` inventory row. */
 export const databaseInstanceSchema = z
@@ -74,7 +73,6 @@ const functionEntrySchema = z.object({
   start: idaAddressSchema,
   end: idaAddressSchema,
 });
-export type IdaFunctionEntry = z.infer<typeof functionEntrySchema>;
 export const inventoryResultSchema = z.object({
   functions: z.array(functionEntrySchema),
 });
@@ -100,7 +98,6 @@ export const containingResultSchema = z.object({
 export type ResolvedProcedure = { name: string; address: string };
 
 export const pseudocodeResultSchema = z.object({ text: z.string() });
-export const assemblyResultSchema = z.object({ lines: z.array(z.string()) });
 export const instructionsResultSchema = z.object({
   instructions: z.array(
     z.object({ address: idaAddressSchema, text: z.string() }),
