@@ -1,5 +1,5 @@
 {
-  "name": "rea-agents",
+  "name": "rea4re",
   "mcpName": "io.github.morluto/rea",
   "version": "6.8.0",
   "description": "Reverse engineer anything from your terminal or agent with one CLI and MCP server.",
@@ -39,8 +39,7 @@
     "#web-bundle-analysis-worker": "./dist/composition/webBundleAnalysisWorkerProcess.js"
   },
   "bin": {
-    "rea": "scripts/rea.mjs",
-    "rea-agents": "scripts/rea.mjs"
+    "rea4re": "scripts/rea.mjs"
   },
   "engines": {
     "node": "^22.23.4 || ^24.22.1 || >=26.12.1"
@@ -452,6 +451,8 @@
     "frida": "17.23.2"
   },
   "allowScripts": {
-    "frida@17.23.2": true
+    "frida@17.23.2": true,
+    "esbuild@0.28.2": true,
+    "esbuild@0.25.12": true
   }
 }
