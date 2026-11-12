@@ -1,4 +1,3 @@
-import { HOPPER_PUBLISHER } from "../domain/hopperPublisher.js";
 import {
   describeHopperRequestFailure,
   hopperRequestRecovery,
@@ -9,7 +8,6 @@ import type { LinuxPackageInstallFailure } from "./LinuxHopper.js";
 
 export type SetupFailureCode =
   | "unsupported_host"
-  | "incompatible_host_version"
   | "download_failed"
   | "integrity_mismatch"
   | "authorization_or_package_manager_failed"
@@ -17,14 +15,9 @@ export type SetupFailureCode =
   | "runtime_dependency_unavailable"
   | "unsupported_hopper_build"
   | "setup_cancelled"
-  | "destination_exists"
-  | "destination_inspection_failed"
   | "archive_write_failed"
   | "launcher_inspection_failed"
-  | "mount_failed"
-  | "bundle_invalid"
   | "publisher_verification_failed"
-  | "copy_failed"
   | "skill_install_failed"
   | "cleanup_failed";
 
@@ -50,7 +43,6 @@ export type SetupHopperInstallFailure = Extract<
 
 export type HopperInstallFailureReason =
   | "unsupported_host"
-  | "incompatible_host_version"
   | "release_metadata"
   | "download"
   | "integrity"
@@ -59,16 +51,11 @@ export type HopperInstallFailureReason =
   | "runtime_dependencies"
   | "unsupported_hopper_build"
   | "cancelled"
-  | "destination_exists"
-  | "destination_inspection"
   | "archive_write"
   | "launcher_inspection"
-  | "mount"
-  | "bundle"
   | "publisher_verification_failed"
   | "verification_unavailable"
-  | "cleanup_failed"
-  | "copy";
+  | "cleanup_failed";
 
 const normalizePackageOutput = (output: string): string =>
   output
@@ -122,15 +109,10 @@ export const setupInstallFailure = (
   reason: HopperInstallFailureReason,
   context: {
     readonly packageFailure?: LinuxPackageInstallFailure | undefined;
-    readonly platform?: NodeJS.Platform;
     readonly download?: HopperRequestFailure | undefined;
   } = {},
 ): SetupHopperInstallFailure => {
-  const failure = stageFailure(
-    reason,
-    context.packageFailure,
-    context.platform ?? "darwin",
-  );
+  const failure = stageFailure(reason, context.packageFailure);
   return context.download === undefined
     ? failure
     : {
@@ -143,7 +125,6 @@ export const setupInstallFailure = (
 const stageFailure = (
   reason: HopperInstallFailureReason,
   packageFailure: LinuxPackageInstallFailure | undefined,
-  platform: NodeJS.Platform,
 ): SetupHopperInstallFailure => {
   switch (reason) {
     case "unsupported_host":
@@ -151,13 +132,6 @@ const stageFailure = (
         status: "failed",
         code: "unsupported_host",
         remediation: "Use a supported host, then rerun rea setup.",
-      };
-    case "incompatible_host_version":
-      return {
-        status: "failed",
-        code: "incompatible_host_version",
-        remediation:
-          "The current Hopper release requires a newer macOS version than this Mac runs, so REA did not install it. Update macOS to at least the version the installer detail names, or install a Hopper release that supports this macOS version yourself and set HOPPER_LAUNCHER_PATH to its launcher, then rerun rea setup.",
       };
     case "integrity":
       return {
@@ -200,13 +174,6 @@ const stageFailure = (
         remediation:
           "Setup was cancelled. Run rea doctor to inspect the current state before retrying.",
       };
-    case "destination_inspection":
-      return {
-        status: "failed",
-        code: "destination_inspection_failed",
-        remediation:
-          "REA could not inspect the Hopper installation destination. Check access to the reported path before retrying; an existing installation has not been established.",
-      };
     case "archive_write":
       return {
         status: "failed",
@@ -221,35 +188,11 @@ const stageFailure = (
         remediation:
           "REA could not verify the installed Hopper launcher. Repair the reported inspection failure before retrying; launcher absence has not been established.",
       };
-    case "destination_exists":
-      return {
-        status: "failed",
-        code: "destination_exists",
-        remediation:
-          "The Hopper installation destination already exists and was not replaced. Reuse the existing installation or move it aside, then rerun rea setup.",
-      };
-    case "mount":
-      return {
-        status: "failed",
-        code: "mount_failed",
-        remediation:
-          "The verified Hopper disk image could not be mounted. Eject any stale Hopper image, check local disk access, then rerun rea setup.",
-      };
-    case "bundle":
-      return {
-        status: "failed",
-        code: "bundle_invalid",
-        remediation:
-          "The mounted package did not contain the expected Hopper application bundle. Retry setup; if it repeats, update REA before installing.",
-      };
     case "publisher_verification_failed":
       return {
         status: "failed",
         code: "publisher_verification_failed",
-        remediation:
-          platform === "linux"
-            ? `The Hopper package signature did not verify under the pinned primary PGP fingerprint ${HOPPER_LINUX_PRIMARY_FINGERPRINT}; the package manager was not run. Download the official package and retry setup.`
-            : `The mounted Hopper application is not signed by the publisher REA pins (${HOPPER_PUBLISHER.bundleIdentifier}, Apple team ${HOPPER_PUBLISHER.teamIdentifier}); nothing was copied or launched. Install Hopper yourself and set HOPPER_LAUNCHER_PATH to its launcher, then rerun rea setup.`,
+        remediation: `The Hopper package signature did not verify under the pinned primary PGP fingerprint ${HOPPER_LINUX_PRIMARY_FINGERPRINT}; the package manager was not run. Download the official package and retry setup.`,
       };
     case "verification_unavailable":
       return {
@@ -264,13 +207,6 @@ const stageFailure = (
         code: "cleanup_failed",
         remediation:
           "Hopper publisher verification retained temporary cleanup ownership. Retry cleanup before running setup again.",
-      };
-    case "copy":
-      return {
-        status: "failed",
-        code: "copy_failed",
-        remediation:
-          "The verified Hopper application could not be copied to the installation destination. Check destination permissions and free space, then rerun rea setup.",
       };
     default:
       return {

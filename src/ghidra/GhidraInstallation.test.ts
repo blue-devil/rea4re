@@ -62,9 +62,9 @@ const headerProbe = (bytes: Buffer) =>
 const JAVA: GhidraJavaObservation = {
   osArch: "amd64",
   osName: "Linux",
-  version: "21.0.11",
+  version: "25.0.1",
   major: SUPPORTED_GHIDRA_JAVA_MAJOR,
-  home: "/usr/lib/jvm/jdk-21",
+  home: "/usr/lib/jvm/jdk-25",
   bits: 64,
   runtime: "jdk",
 };
@@ -431,7 +431,7 @@ describe("Ghidra installation inspection", () => {
       status: "available",
       providerVersion: SUPPORTED_GHIDRA_VERSION,
       analyzeHeadlessPath: HEADLESS,
-      javaVersion: "21.0.11",
+      javaVersion: "25.0.1",
     });
   });
 
@@ -515,6 +515,45 @@ describe("Ghidra installation inspection", () => {
   );
 });
 
+describe("Ghidra Windows ARM64 installation inspection", () => {
+  it("accepts win32/arm64 through the emulated win_x86_64 decompiler", async () => {
+    const decompiler = `${WINDOWS_INSTALL}\\Ghidra\\Features\\Decompiler\\os\\win_x86_64\\decompile.exe`;
+    expect(
+      await inspectGhidraInstallation(
+        {
+          resourceOwner: inspectionResources.owner,
+          environment: {},
+          installDir: WINDOWS_INSTALL,
+          platform: "win32",
+          architecture: "arm64",
+        },
+        host({
+          platform: "win32",
+          architecture: "arm64",
+          readText: (path) =>
+            path === WINDOWS_PROPERTIES
+              ? `application.version=${SUPPORTED_GHIDRA_VERSION}\napplication.java.min=25\n`
+              : undefined,
+          executable: (path) =>
+            path === WINDOWS_HEADLESS || path === decompiler,
+          probeJava: () =>
+            javaProbeOk<GhidraJavaObservation>({
+              ...JAVA,
+              home: "C:\\Java\\jdk-25",
+              osName: "Windows 11",
+              osArch: "aarch64",
+            }),
+        }),
+      ),
+    ).toMatchObject({
+      status: "available",
+      platform: "win32",
+      architecture: "arm64",
+      nativeDecompilerPath: decompiler,
+    });
+  });
+});
+
 describe("Ghidra Windows installation commitment", () => {
   it("accepts the exact Windows x64 batch launcher and JDK commitment", async () => {
     const windowsHost: GhidraInstallationHost = {
@@ -522,16 +561,16 @@ describe("Ghidra Windows installation commitment", () => {
       architecture: "x64",
       readText: (path) =>
         path === WINDOWS_PROPERTIES
-          ? `application.version=${SUPPORTED_GHIDRA_VERSION}\napplication.java.min=21\n`
+          ? `application.version=${SUPPORTED_GHIDRA_VERSION}\napplication.java.min=25\n`
           : undefined,
       executable: (path) =>
         path === WINDOWS_HEADLESS || path === WINDOWS_DECOMPILER,
       probeJava: (command, environment) => {
-        expect(command).toBe("C:\\Java\\jdk-21\\bin\\java.exe");
-        expect(environment.PATH).toMatch(/^C:\\Java\\jdk-21\\bin;/u);
+        expect(command).toBe("C:\\Java\\jdk-25\\bin\\java.exe");
+        expect(environment.PATH).toMatch(/^C:\\Java\\jdk-25\\bin;/u);
         return javaProbeOk<GhidraJavaObservation>({
           ...JAVA,
-          home: "C:\\Java\\jdk-21",
+          home: "C:\\Java\\jdk-25",
           osName: "Windows 11",
         });
       },
@@ -543,7 +582,7 @@ describe("Ghidra Windows installation commitment", () => {
           resourceOwner: inspectionResources.owner,
           environment: {},
           installDir: WINDOWS_INSTALL,
-          javaHome: "C:\\Java\\jdk-21",
+          javaHome: "C:\\Java\\jdk-25",
           platform: "win32",
           architecture: "x64",
         },
@@ -554,7 +593,7 @@ describe("Ghidra Windows installation commitment", () => {
       platform: "win32",
       architecture: "x64",
       analyzeHeadlessPath: WINDOWS_HEADLESS,
-      javaCommand: "C:\\Java\\jdk-21\\bin\\java.exe",
+      javaCommand: "C:\\Java\\jdk-25\\bin\\java.exe",
       providerVersion: SUPPORTED_GHIDRA_VERSION,
     });
   });
@@ -1674,8 +1713,8 @@ describe("Ghidra Java probe os.arch extraction", () => {
   it("extracts os.arch through the real Java probe into the installation diagnostics", async () => {
     const stderr = [
       "Property settings:",
-      "    java.home = /usr/lib/jvm/jdk-21",
-      "    java.version = 21.0.11",
+      "    java.home = /usr/lib/jvm/jdk-25",
+      "    java.version = 25.0.1",
       "    java.vm.name = OpenJDK 64-Bit Server VM",
       "    os.arch = x86_64",
       "    os.name = Linux",
@@ -1687,7 +1726,7 @@ describe("Ghidra Java probe os.arch extraction", () => {
         resourceOwner: inspectionResources.owner,
         environment: {},
         installDir: INSTALL,
-        javaHome: "/usr/lib/jvm/jdk-21",
+        javaHome: "/usr/lib/jvm/jdk-25",
         platform: "linux",
         architecture: "x64",
       },
@@ -1732,7 +1771,7 @@ it.each(["arm64", "x64"] as const)(
   "discovers installed versioned Homebrew Java on macOS %s",
   async (architecture) => {
     const prefix = architecture === "arm64" ? "/opt/homebrew" : "/usr/local";
-    const command = `${prefix}/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home/bin/java`;
+    const command = `${prefix}/opt/openjdk@25/libexec/openjdk.jdk/Contents/Home/bin/java`;
     const commands: string[] = [];
     const inspection = await inspectGhidraInstallation(
       {
@@ -1745,7 +1784,7 @@ it.each(["arm64", "x64"] as const)(
       host({
         directoryEntries: (directory) =>
           directory === `${prefix}/opt`
-            ? ["openjdk@21", "unrelated", "openjdk@21/../foreign"]
+            ? ["openjdk@25", "unrelated", "openjdk@25/../foreign"]
             : [],
         executable: (candidate) =>
           candidate === "/usr/bin/java" ||
@@ -2082,7 +2121,7 @@ it.each([
       },
       host({
         readText: () =>
-          `application.version=${SUPPORTED_GHIDRA_VERSION}\napplication.java.min=21\n`,
+          `application.version=${SUPPORTED_GHIDRA_VERSION}\napplication.java.min=25\n`,
         executable: (candidate) => {
           checked.push(candidate);
           return candidate === pathJava || host().executable(candidate);

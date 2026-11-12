@@ -6,17 +6,10 @@ import { workspaceCliTest } from "../../support/cli/workspaceCliFixture.js";
 import { elf } from "../../../src/domain/binaryTarget.fixture.js";
 
 const tools = [
-  "idb_open",
-  "idb_list",
-  "idb_close",
-  "server_health",
-  "list_funcs",
-  "lookup_funcs",
-  "find_regex",
-  "decompile",
-  "disasm",
-  "callees",
-  "xrefs_to",
+  "open_database",
+  "execute_python",
+  "list_databases",
+  "close_database",
 ];
 const requestSchema = z.object({
   id: z.union([z.string(), z.number()]).optional(),
@@ -29,6 +22,7 @@ const requestSchema = z.object({
     })
     .optional(),
 });
+const opMarker = /^# rea-op:(\w+)\n# rea-args:(\{.*\})\n([\s\S]*)$/u;
 
 type StartupMode =
   | "missing-profile"
@@ -36,17 +30,17 @@ type StartupMode =
   | "catalog-timeout"
   | "catalog-refused"
   | "headless-input-mismatch"
-  | "unexpected-worker"
+  | "instance-inventory"
   | "success";
 
-type StartupSupervisorState = {
+type StartupServerState = {
   readonly mode: StartupMode;
   readonly calls: string[];
-  database: string | undefined;
+  instanceId: string | undefined;
   input: string | undefined;
 };
 const handleStartupRequest = async (
-  state: StartupSupervisorState,
+  state: StartupServerState,
   request: IncomingMessage,
   response: ServerResponse,
 ) => {
@@ -89,7 +83,8 @@ const handleStartupRequest = async (
     send({
       tools: tools
         .filter(
-          (name) => state.mode !== "missing-profile" || name !== "list_funcs",
+          (name) =>
+            state.mode !== "missing-profile" || name !== "execute_python",
         )
         .map((name) => ({
           name,
@@ -104,92 +99,91 @@ const handleStartupRequest = async (
     throw new Error("Unexpected RPC");
   state.calls.push(name);
   let result: unknown;
-  if (name === "idb_open") {
-    state.database = z.string().parse(args.preferred_session_id);
-    state.input = z.string().parse(args.input_path);
+  if (name === "open_database") {
+    state.input = z.string().parse(args.path);
+    state.instanceId = "fixture-instance-1";
     result = {
-      success: true,
-      session: {
-        session_id:
-          state.mode === "unexpected-worker"
-            ? "unexpected-worker"
-            : state.database,
-        input_path: state.input,
-      },
+      instance_id:
+        state.mode === "instance-inventory"
+          ? "missing-instance"
+          : state.instanceId,
+      backend: "idalib",
+      status: "attached",
+      recovery: "none",
+      log_path: `${state.input}.log`,
+      mcp_id: null,
+      hint: null,
     };
-  } else if (name === "idb_list")
+  } else if (name === "list_databases")
     result = {
-      sessions:
-        state.database === undefined
+      instances:
+        state.instanceId === undefined || state.mode === "instance-inventory"
           ? []
           : [
               {
-                session_id: state.database,
-                input_path: state.input,
-                owned: true,
-                backend: "worker",
-                is_active: true,
+                path: state.input,
+                backend: "idalib",
+                status: "attached",
+                instance_id: state.instanceId,
+                error: null,
               },
             ],
     };
-  else if (name === "idb_close") {
+  else if (name === "close_database") {
     result = {
-      success: true,
-      session_id: state.database,
-      saved: null,
-      owned: true,
-      backend: "worker",
+      closed: true,
+      final_lease: true,
+      idb_path: `${state.input}.i64`,
     };
-    state.database = undefined;
-  } else if (name === "server_health")
-    result = {
-      status: "ok",
-      input_path:
-        state.mode === "headless-input-mismatch"
-          ? state.input + ".other"
-          : state.input,
-      idb_path: state.input + ".i64",
-      module: "target.elf",
-      imagebase: "0x1000",
-      auto_analysis_ready: true,
-    };
-  else if (name === "lookup_funcs")
-    result = z
-      .array(z.string())
-      .parse(args.queries)
-      .map((query) => ({
-        query,
-        fn: { addr: "0x1000", name: "main", size: "0x20" },
-        error: null,
-      }));
-  else if (name === "decompile")
-    result = {
-      code: "int main(void) { return 42; }",
-      cursor: { done: true },
-    };
-  else throw new Error("Unexpected tool: " + name);
+    state.instanceId = undefined;
+  } else if (name === "execute_python") {
+    const op = opMarker.exec(z.string().parse(args.code))?.[1];
+    if (op === "identity")
+      result = {
+        result: {
+          path:
+            state.mode === "headless-input-mismatch"
+              ? `${state.input}.other`
+              : state.input,
+          sha256: null,
+          base: "0x1000",
+          architecture: "metapc",
+          bitness: 64,
+        },
+        stdout: "",
+        stderr: "",
+      };
+    else if (op === "by_name")
+      result = {
+        result: { name: "main", start: "0x1000" },
+        stdout: "",
+        stderr: "",
+      };
+    else if (op === "pseudocode")
+      result = {
+        result: { text: "int main(void) { return 42; }" },
+        stdout: "",
+        stderr: "",
+      };
+    else throw new Error("Unexpected operation: " + String(op));
+  } else throw new Error("Unexpected tool: " + name);
   send({ content: [{ type: "text", text: JSON.stringify(result) }] });
 };
 
-const createStartupSupervisor = async (mode: StartupMode) => {
-  const state: StartupSupervisorState = {
+const createStartupServer = async (mode: StartupMode) => {
+  const state: StartupServerState = {
     mode,
     calls: [],
-    database: undefined,
+    instanceId: undefined,
     input: undefined,
   };
-  const { server, close } = createVerifierHttpServer((request, response) =>
+  const server = await createVerifierHttpServer((request, response) =>
     handleStartupRequest(state, request, response),
   );
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  return {
-    server,
-    calls: state.calls,
-    get database() {
-      return state.database;
-    },
-    close,
-  };
+  await new Promise<void>((resolve) => {
+    server.server.listen(0, "127.0.0.1", () => resolve());
+  });
+  return { server, calls: state.calls, state };
 };
 
 workspaceCliTest.for([
@@ -198,15 +192,15 @@ workspaceCliTest.for([
   "catalog-timeout",
   "catalog-refused",
   "headless-input-mismatch",
-  "unexpected-worker",
+  "instance-inventory",
   "success",
 ] as const)(
   "attributes selected IDA startup to the public analysis: %s",
   async (mode, { cli, workspace }) => {
-    const supervisor = await createStartupSupervisor(mode);
-    const { server, calls } = supervisor;
+    const startup = await createStartupServer(mode);
+    const { server, calls, state } = startup;
     try {
-      const address = server.address();
+      const address = server.server.address();
       if (address === null || typeof address === "string")
         throw new Error("Missing server address");
       const workspaceRoot = await workspace.mkdir("ida-workspaces");
@@ -230,32 +224,31 @@ workspaceCliTest.for([
         timeoutMs: 15000,
       });
       expect(result.stderr).toBe("");
-      expect(supervisor.database).toBeUndefined();
+      expect(state.instanceId).toBeUndefined();
       if (mode === "success") {
         expect(result.exitCode).toBe(0);
         expect(result.json).toMatchObject({
           operation: "procedure_pseudo_code",
           normalized_result: "int main(void) { return 42; }",
         });
-        expect(calls).toContain("decompile");
-        expect(calls).toContain("idb_close");
+        expect(calls).toContain("execute_python");
+        expect(calls).toContain("close_database");
         return;
       }
       expect(result.exitCode).toBe(1);
-      if (mode === "headless-input-mismatch" || mode === "unexpected-worker") {
-        expect(calls).not.toContain("decompile");
-        expect(calls).toContain("idb_close");
+      if (mode === "headless-input-mismatch" || mode === "instance-inventory") {
+        expect(calls).toContain("close_database");
         expect(result.json).toMatchObject({
           code: "unreadable_output",
           retryable: false,
           message: expect.stringContaining(
             mode === "headless-input-mismatch"
               ? "input identity changed"
-              : "unexpected session",
+              : "database inventory",
           ),
           remediation: {
             action: expect.stringContaining(
-              mode === "headless-input-mismatch" ? "reopen" : "session ID",
+              mode === "headless-input-mismatch" ? "reopen" : "lists opened",
             ),
           },
           details: {
@@ -264,7 +257,7 @@ workspaceCliTest.for([
               identity_check:
                 mode === "headless-input-mismatch"
                   ? "headless_input"
-                  : "worker_session",
+                  : "instance_inventory",
               reason: expect.any(String),
               recovery: expect.any(String),
             },
@@ -287,7 +280,7 @@ workspaceCliTest.for([
         expect(result.json).toMatchObject({
           details: {
             diagnostics: {
-              missing_tools: ["list_funcs"],
+              missing_tools: ["execute_python"],
               startup_operation: "initialize",
             },
           },
@@ -307,7 +300,7 @@ workspaceCliTest.for([
           },
         });
     } finally {
-      await supervisor.close();
+      await server.close();
     }
   },
 );

@@ -2,13 +2,6 @@ import type { RegexMatchingDeadline } from "../config/regexMatchingDeadline.js";
 import type { RegexWorkerHeapRequest } from "../config/regexWorkerHeapRequest.js";
 import { z } from "zod";
 import {
-  nativeDecompileSchema,
-  nativeDisassemblySchema,
-  nativeCalleesSchema,
-  nativeXrefsSchema,
-  nativeLiteralSearchPattern,
-} from "./IdaNativeProtocol.js";
-import {
   analysisSearchPredicate,
   analysisSearchQuerySchema,
   type AnalysisSearchQuery,
@@ -29,40 +22,25 @@ import {
 import type { JsonValue } from "../domain/jsonValue.js";
 import type { RelationshipCoverage } from "../domain/relationshipCoverage.js";
 import { combineFunctionRelationshipCoverage } from "../domain/functionCallCoverage.js";
-import {
-  readCallGraphCallees,
-  IDA_CALLEE_DISCOVERY,
-  unavailableCallGraph,
-} from "./IdaCallGraph.js";
 import type { IdaMcpConnection } from "./IdaMcpConnection.js";
 import type { IdaOperation } from "./IdaProviderCapabilities.js";
-import {
-  IDA_LIMITATIONS,
-  IDA_NATIVE_STRING_LIMITATION,
-} from "./IdaProviderCapabilities.js";
+import { IDA_LIMITATIONS } from "./IdaProviderCapabilities.js";
 import type { EvidenceLocation } from "../domain/evidence.js";
+import { idaAddressSchema } from "./IdaProtocolValues.js";
 import {
-  disassemblySchema,
-  idaAddressSchema,
-  idaFunctionSchema,
-  idaStringsPageSchema,
-  legacyCalleesSchema,
-  legacyPageSchema,
-  legacyStringSchema,
-  legacyXrefsSchema,
-  modernCalleesSchema,
-  modernDecompileSchema,
-  modernDisassemblySchema,
-  modernLookupSchema,
-  modernLookupBatchSchema,
-  modernPageSchema,
-  modernXrefsSchema,
-  nextOffset,
-  nextPageOffset,
-  surveySegmentsSchema,
-  type IdaDisassembly,
-  type IdaFunction,
-} from "./IdaProtocolValues.js";
+  parseExecutePythonResult,
+  idaHexraysCode,
+  inventoryResultSchema,
+  stringsResultSchema,
+  byNameResultSchema,
+  containingResultSchema,
+  pseudocodeResultSchema,
+  instructionsResultSchema,
+  callersResultSchema,
+  calleesResultSchema,
+  xrefsResultSchema,
+  type ResolvedProcedure,
+} from "./IdaHexraysProtocol.js";
 
 /** One operation's raw source observations, retained alongside normalized results. */
 export interface IdaRawObservation {
@@ -75,7 +53,7 @@ const unknownBody = {
   available: false,
   reason: "IDA MCP does not report complete function body ranges.",
 } as const;
-const identity = (fn: IdaFunction) => ({
+const identity = (fn: { address: string; name: string }) => ({
   address: fn.address,
   name: fn.name,
   symbol: null,
@@ -85,101 +63,80 @@ const identity = (fn: IdaFunction) => ({
 interface IdaRelationships {
   readonly items: ReturnType<typeof identity>[];
   readonly coverage: RelationshipCoverage;
-  readonly availability:
-    | { readonly available: true }
-    | { readonly available: false; readonly reason: string };
 }
 
-/** The only lookup answers upstream reports for a name or address that is not a function. */
-const MISSING_PROCEDURE_ANSWERS: ReadonlySet<string> = new Set([
-  "Not found",
-  "Not a function",
-]);
-const lines = (asm: IdaDisassembly) =>
-  asm.lines.map(({ address, instruction }) => `${address}: ${instruction}`);
+const UNKNOWN_COVERAGE: RelationshipCoverage = {
+  status: "unknown",
+  reason: "The upstream relationship response does not report coverage.",
+};
 
-/** Translate explicit analyst questions into a closed set of read-only upstream requests. */
+/** Translate explicit analyst questions into closed read-only execute_python programs. */
 export class IdaOperationRunner {
   readonly raw: IdaRawObservation[] = [];
   readonly locations: EvidenceLocation[] = [];
   readonly limitations: string[] = [];
   relationshipCoverage: RelationshipCoverage | undefined;
-  /** The upstream cap flag of the last `xrefs_to` read, when the producer reported one. */
-  referencesTruncated: boolean | undefined;
   constructor(
     private readonly connection: IdaMcpConnection,
-    private readonly protocol: "legacy" | "modern" | "native",
-    private readonly database?: string,
+    private readonly instanceId?: string,
     private readonly options: {
       readonly signal?: AbortSignal | undefined;
       readonly regexMatchingDeadline?: RegexMatchingDeadline | undefined;
       readonly regexWorkerHeapRequest?: RegexWorkerHeapRequest | undefined;
       readonly selectorOrigin?: "provider" | undefined;
-      /** False when the loaded processor may not be x86, so `callees` cannot be trusted alone. */
-      readonly x86Only?: boolean;
-      /** False when the upstream server does not advertise `callgraph`. */
-      readonly callGraphAvailable?: boolean;
-      /** False when the upstream server does not advertise `survey_binary`. */
-      readonly surveyAvailable?: boolean;
       /** The program identity REA admitted, reported by `list_documents`. */
       readonly admittedDocument?: string;
+      /** Whole-request budget for one execute_python call, in seconds. */
+      readonly timeoutSeconds?: number | undefined;
     } = {},
   ) {}
 
-  async call(
-    tool: string,
-    args: Readonly<Record<string, JsonValue>>,
-  ): Promise<JsonValue> {
+  /** Run one builder program and parse its trailing expression fail-closed. */
+  private async python<T>(
+    code: string,
+    schema: z.ZodType<T>,
+    operation = "execute_python",
+  ): Promise<T> {
     if (this.options.signal?.aborted)
-      throw new AnalysisCancelledError(tool, {
+      throw new AnalysisCancelledError(operation, {
         cause: this.options.signal.reason,
       });
-    const scoped =
-      this.database === undefined ? args : { ...args, database: this.database };
-    const result = await this.connection.call(tool, scoped, {
+    const args = {
+      code,
+      ...(this.instanceId === undefined
+        ? {}
+        : { instance_id: this.instanceId }),
+      timeout: this.options.timeoutSeconds ?? 360,
+    };
+    const result = await this.connection.call("execute_python", args, {
       signal: this.options.signal,
     });
-    this.raw.push({ tool, arguments: scoped, result });
+    this.raw.push({ tool: "execute_python", arguments: args, result });
     if (this.options.signal?.aborted)
-      throw new AnalysisCancelledError(tool, {
+      throw new AnalysisCancelledError(operation, {
         cause: this.options.signal.reason,
       });
-    return result;
+    return schema.parse(parseExecutePythonResult(result));
   }
 
-  async functions(): Promise<IdaFunction[]> {
-    const result: IdaFunction[] = [];
-    let offset: number | null = 0;
-    while (offset !== null) {
-      const current: number = offset;
-      const value: z.infer<typeof legacyPageSchema> | undefined =
-        this.protocol === "legacy"
-          ? legacyPageSchema.parse(
-              await this.call("list_functions", { offset, count: 100 }),
-            )
-          : modernPageSchema.parse(
-              await this.call("list_funcs", {
-                queries: { offset, count: 100 },
-              }),
-            )[0];
-      if (value === undefined)
-        throw new AnalysisProtocolError("IDA MCP omitted its function page.");
-      result.push(...value.data.map((fn) => idaFunctionSchema.parse(fn)));
-      offset = nextPageOffset(value.next_offset, current);
-    }
-    return result;
+  async functions(): Promise<{ address: string; name: string }[]> {
+    const { functions } = await this.python(
+      idaHexraysCode.inventory(),
+      inventoryResultSchema,
+    );
+    return functions.map(({ name, start }) => ({ address: start, name }));
   }
 
   /**
-   * Resolves a procedure. When `requestedBy` names the caller's operation, an
-   * upstream "not found" or "not a function" answer is reported as invalid
-   * input; every other failed lookup stays a producer fault. `run()` passes
-   * `requestedBy` only for caller-supplied selectors. Provider-derived
-   * selectors, such as the addresses composed workflows revisit, and the
-   * callee resolution inside `relationships()` pass none, because those
-   * addresses were reported by IDA itself.
+   * Resolves a procedure by exact name, or by entry/interior address when the
+   * caller selects an explicit 0x address. When `requestedBy` names the
+   * caller's operation, an unresolved selector is invalid input; every other
+   * failed lookup stays a producer fault.
    */
-  async resolve(query: string, requestedBy?: string): Promise<IdaFunction> {
+  async resolve(
+    query: string,
+    requestedBy?: string,
+  ): Promise<{ address: string; name: string }> {
     if (query.startsWith("file-offset:"))
       throw new AnalysisInputError(
         requestedBy ?? "procedure_address",
@@ -193,78 +150,35 @@ export class IdaOperationRunner {
           },
         ],
       );
-    if (this.protocol !== "legacy") {
-      const item = modernLookupSchema.parse(
-        await this.call("lookup_funcs", { queries: [query] }),
-      )[0];
-      return this.lookupFunction(query, item, requestedBy);
-    }
     const address = idaAddressSchema.safeParse(
       /^0x/iu.test(query) ? query : undefined,
     );
-    const found = idaFunctionSchema.parse(
-      await this.call(
-        address.success ? "get_function_by_address" : "get_function_by_name",
-        address.success ? { address: address.data } : { name: query },
-      ),
-    );
-    // Legacy producers may echo an interior query or call site in address.
-    // Resolve the reported symbol again to obtain its actual entry, never infer from size.
-    const entry = idaFunctionSchema.parse(
-      await this.call("get_function_by_name", { name: found.name }),
-    );
-    if (entry.name !== found.name)
-      throw new AnalysisProtocolError(
-        "IDA function identity changed during lookup.",
-      );
-    return entry;
-  }
-
-  /** Parse one lookup row: a function, an expected "missing" answer, or a producer failure. */
-  private lookupOutcome(
-    query: string,
-    item: z.infer<typeof modernLookupBatchSchema>[number] | undefined,
-  ): { readonly fn: IdaFunction } | { readonly missing: string } {
-    if (item?.query !== query)
-      throw new AnalysisProtocolError(
-        `IDA function lookup answered for a different query than ${JSON.stringify(query)}.`,
-      );
-    if (
-      item.fn === null &&
-      item.error !== null &&
-      MISSING_PROCEDURE_ANSWERS.has(item.error)
-    )
-      return { missing: item.error };
-    if (item.fn === null || item.error !== null)
-      throw new AnalysisProtocolError(
-        `IDA function lookup failed for ${query}: ${item.error ?? "missing function"}`,
-      );
-    return { fn: item.fn };
-  }
-
-  private lookupFunction(
-    query: string,
-    item: z.infer<typeof modernLookupBatchSchema>[number] | undefined,
-    requestedBy?: string,
-  ): IdaFunction {
-    const outcome = this.lookupOutcome(query, item);
-    if ("fn" in outcome) return outcome.fn;
+    const resolved = address.success
+      ? (
+          await this.python(
+            idaHexraysCode.containing(address.data),
+            containingResultSchema,
+          )
+        ).match
+      : await this.python(idaHexraysCode.byName(query), byNameResultSchema);
+    if (resolved !== null) return resolved;
+    const missing = address.success ? "not a function" : "not found";
     if (requestedBy === undefined)
       throw new AnalysisProtocolError(
-        `IDA function lookup failed for ${query}: ${outcome.missing}`,
+        `IDA function lookup failed for ${query}: ${missing}`,
       );
     throw new AnalysisInputError(
       requestedBy,
       {
         cause: new AnalysisProtocolError(
-          `IDA function lookup failed for ${query}: ${outcome.missing}`,
+          `IDA function lookup failed for ${query}: ${missing}`,
         ),
       },
       [
         {
           path: [],
           reason: "invalid_value",
-          message: `IDA could not resolve procedure ${JSON.stringify(query)}: ${outcome.missing}.`,
+          message: `IDA could not resolve procedure ${JSON.stringify(query)}: ${missing}.`,
         },
       ],
     );
@@ -272,346 +186,79 @@ export class IdaOperationRunner {
 
   /** The containing function of an address, or why none contains it. */
   private async containingProcedure(address: string): Promise<JsonValue> {
-    const item = modernLookupSchema.parse(
-      await this.call("lookup_funcs", { queries: [address] }),
-    )[0];
-    const outcome = this.lookupOutcome(address, item);
-    if ("fn" in outcome)
-      return {
-        query_address: address,
-        found: true,
-        procedure: identity(outcome.fn),
-      };
+    const outcome = await this.python(
+      idaHexraysCode.containing(address),
+      containingResultSchema,
+    );
     return {
       query_address: address,
-      found: false,
-      procedure: null,
-      reason: (await this.addressInSegment(address))
-        ? "not_in_procedure"
-        : "outside_segments",
+      found: outcome.match !== null,
+      procedure: outcome.match === null ? null : identity(outcome.match),
+      ...(outcome.match === null
+        ? {
+            reason: outcome.outside
+              ? ("outside_segments" as const)
+              : ("not_in_procedure" as const),
+          }
+        : {}),
     };
   }
 
-  /** Segment membership from the database-scoped minimal survey; a missing fact is a failure. */
-  private async addressInSegment(address: string): Promise<boolean> {
-    if (this.options.surveyAvailable === false)
-      throw new AnalysisProtocolError(
-        "The upstream server does not advertise survey_binary, so segment membership cannot be established.",
-      );
-    const { segments } = surveySegmentsSchema.parse(
-      await this.call("survey_binary", { detail_level: "minimal" }),
+  async strings(): Promise<{ address: string; value: string }[]> {
+    const { strings } = await this.python(
+      idaHexraysCode.strings(),
+      stringsResultSchema,
     );
-    const value = BigInt(address);
-    return segments.some(({ start, end }) => start <= value && value < end);
+    return strings.map(({ address, text }) => ({ address, value: text }));
   }
 
-  /** True only for modern callee reads on targets not proven x86-only; x86 reads never reach the graph code. */
-  private readsCallGraph(direction: "callers" | "callees"): boolean {
-    return (
-      this.protocol === "modern" &&
-      direction === "callees" &&
-      this.options.x86Only === false
+  /** Addressed instruction lines of one procedure, rendered "address: text". */
+  async assembly(fn: { address: string }): Promise<string[]> {
+    const { instructions } = await this.python(
+      idaHexraysCode.instructions(fn.address),
+      instructionsResultSchema,
     );
+    return instructions.map(({ address, text }) => `${address}: ${text}`);
   }
 
-  /** Add processor-neutral function callees on targets where upstream `callees` is unsound. */
-  private async addCallGraphCallees(
-    fn: IdaFunction,
-    result: Map<string, ReturnType<typeof identity>>,
-  ): Promise<RelationshipCoverage> {
-    const graph =
-      this.options.callGraphAvailable === false
-        ? unavailableCallGraph("the upstream server does not advertise it")
-        : await readCallGraphCallees(
-            (tool, args) => this.call(tool, args),
-            fn.address,
-          );
-    this.limitations.push(...graph.limitations);
-    for (const callee of graph.callees)
-      if (!result.has(callee.address))
-        result.set(callee.address, identity(callee));
-    return graph.coverage;
+  async pseudocode(fn: { address: string }): Promise<string> {
+    const { text } = await this.python(
+      idaHexraysCode.pseudocode(fn.address),
+      pseudocodeResultSchema,
+    );
+    return text;
   }
 
-  async strings(
-    nativePattern?: string,
-  ): Promise<{ address: string; value: string }[]> {
-    if (this.protocol === "native")
-      this.limitations.push(IDA_NATIVE_STRING_LIMITATION);
-    const result: { address: string; value: string }[] = [];
-    let offset: number | null = 0;
-    while (offset !== null) {
-      const current: number = offset;
-      if (this.protocol === "legacy") {
-        const page = legacyPageSchema.parse(
-          await this.call("list_strings", { offset, count: 0 }),
-        );
-        for (const item of page.data) {
-          const s = legacyStringSchema.parse(item);
-          result.push({ address: s.address, value: s.string });
-        }
-        offset = nextPageOffset(page.next_offset, current);
-      } else {
-        const page = idaStringsPageSchema.parse(
-          await this.call("find_regex", {
-            pattern:
-              this.protocol === "native"
-                ? (nativePattern ?? "[\\s\\S]*")
-                : "(?s).*",
-            offset,
-            limit: 100,
-          }),
-        );
-        if (page.error !== undefined && page.error !== null)
-          throw new AnalysisProtocolError(
-            `${this.protocol === "native" ? "Native IDA" : "IDA"} string search failed: ${page.error}`,
-          );
-        result.push(
-          ...page.matches.map((s) => ({ address: s.addr, value: s.string })),
-        );
-        offset = nextOffset(page.cursor, current);
-      }
-    }
-    return result;
-  }
-
-  async assembly(fn: IdaFunction): Promise<IdaDisassembly> {
-    if (this.protocol === "legacy") {
-      const result = disassemblySchema.parse(
-        await this.call("disassemble_function", { start_address: fn.address }),
-      );
-      this.verifyAssembly(fn, result);
-      return result;
-    }
-    let result: IdaDisassembly | undefined;
-    let offset: number | null = 0;
-    while (offset !== null) {
-      const page = (
-        this.protocol === "native"
-          ? nativeDisassemblySchema
-          : modernDisassemblySchema
-      ).parse(
-        await this.call("disasm", {
-          addr: fn.address,
-          offset,
-          max_instructions: 100,
-        }),
-      );
-      if (page.asm === null || page.error !== undefined)
-        throw new AnalysisProtocolError(
-          `IDA disassembly failed: ${page.error ?? "missing assembly"}`,
-        );
-      this.verifyAssembly(fn, page.asm);
-      if (result === undefined) result = page.asm;
-      else result.lines.push(...page.asm.lines);
-      offset = nextOffset(page.cursor, offset);
-    }
-    if (result === undefined)
-      throw new AnalysisProtocolError("IDA omitted assembly.");
-    return result;
-  }
-
-  private verifyAssembly(fn: IdaFunction, asm: IdaDisassembly): void {
-    if (asm.start_ea !== fn.address || asm.name !== fn.name)
-      throw new AnalysisProtocolError(
-        "IDA disassembly identifies a different function than the resolved entry.",
-      );
-  }
-
-  async pseudocode(fn: IdaFunction): Promise<string | null> {
-    if (this.protocol === "legacy")
-      return z
-        .string()
-        .nullable()
-        .parse(await this.call("decompile_function", { address: fn.address }));
-    if (this.protocol === "native") {
-      const page = nativeDecompileSchema.parse(
-        await this.call("decompile", { addr: fn.address }),
-      );
-      if (page.addr !== fn.address)
-        throw new AnalysisProtocolError(
-          "Native IDA pseudocode identifies a different function than the resolved entry.",
-        );
-      if (!page.ok || page.error !== undefined || page.pseudocode === undefined)
-        throw new AnalysisProtocolError(
-          `Native IDA decompilation failed: ${page.error ?? "missing pseudocode"}`,
-        );
-      this.limitations.push(
-        "Native pseudocode is rendered GUI text; the upstream viewer traversal is bounded and does not establish complete source recovery.",
-      );
-      return page.pseudocode;
-    }
-    const result: string[] = [];
-    let offset: number | null = 0;
-    while (offset !== null) {
-      const page = modernDecompileSchema.parse(
-        await this.call("decompile", {
-          addr: fn.address,
-          offset,
-          max_lines: 100,
-        }),
-      );
-      if (page.code === null || page.error !== undefined)
-        throw new AnalysisProtocolError(
-          `IDA decompilation failed: ${page.error ?? "missing code"}`,
-        );
-      result.push(page.code);
-      offset = nextOffset(page.cursor, offset);
-    }
-    return result.join("\n");
-  }
-
-  async xrefs(
-    address: string,
-  ): Promise<
-    { address: string; type: string; function: IdaFunction | null }[]
-  > {
-    if (this.protocol === "legacy")
-      return legacyXrefsSchema.parse(
-        await this.call("get_xrefs_to", { address }),
-      );
-    const page = (
-      this.protocol === "native" ? nativeXrefsSchema : modernXrefsSchema
-    ).parse(await this.call("xrefs_to", { addrs: [address], limit: 1000 }))[0];
-    if (page?.xrefs == null || page.error !== undefined)
-      throw new AnalysisProtocolError(
-        `IDA xrefs failed: ${page?.error ?? "missing references"}`,
-      );
-    if (page.more !== undefined) this.referencesTruncated = page.more;
-    if (page.more === true)
-      this.limitations.push(
-        "Upstream xrefs_to capped results at 1000 references; additional references remain unknown.",
-      );
-    return page.xrefs.map((xref) => ({
-      address: xref.addr,
-      type: xref.type,
-      function: xref.fn,
-    }));
+  /** All references to an address, classified by the upstream xref predicates. */
+  async xrefs(address: string): Promise<{ address: string; type: string }[]> {
+    const { to } = await this.python(
+      idaHexraysCode.xrefs(address),
+      xrefsResultSchema,
+    );
+    return to.map(({ from, type }) => ({ address: from, type }));
   }
 
   async relationships(
-    fn: IdaFunction,
+    fn: { address: string },
     direction: "callers" | "callees",
   ): Promise<IdaRelationships> {
-    const queries: string[] = [];
-    const result = new Map<string, ReturnType<typeof identity>>();
-    let coverage: RelationshipCoverage = {
-      status: "unknown",
-      reason: "The legacy relationship response does not report coverage.",
-    };
-    if (this.readsCallGraph(direction)) {
-      coverage = await this.addCallGraphCallees(fn, result);
-      return {
-        items: [...result.values()],
-        coverage,
-        availability:
-          coverage.status === "unknown"
-            ? { available: false, reason: coverage.reason }
-            : { available: true },
-      };
-    }
-    if (this.protocol === "legacy") {
-      const value = await this.call(
-        direction === "callers" ? "get_callers" : "get_callees",
-        { function_address: fn.address },
+    if (direction === "callers") {
+      const { callers } = await this.python(
+        idaHexraysCode.callers(fn.address),
+        callersResultSchema,
       );
-      const items =
-        direction === "callers"
-          ? z.array(idaFunctionSchema).parse(value)
-          : legacyCalleesSchema.parse(value);
-      for (const item of items) {
-        if ("type" in item && item.type === "external")
-          result.set(item.address, identity(item));
-        else queries.push(item.name);
-      }
-    } else if (direction === "callers") {
-      this.limitations.push(
-        "Upstream xrefs classify references as code or data, without proving call edges. Direct callers are unavailable in this profile.",
+      const items = callers.map(({ from, caller }) =>
+        identity(caller ?? { address: from, name: `sub_${from.slice(2)}` }),
       );
-      return {
-        items: [],
-        availability: {
-          available: false,
-          reason:
-            "Upstream xrefs do not establish direct caller relationships.",
-        },
-        coverage: {
-          status: "unknown",
-          reason:
-            "Upstream xrefs do not establish direct caller relationships.",
-        },
-      };
-    } else {
-      const page = (
-        this.protocol === "native" ? nativeCalleesSchema : modernCalleesSchema
-      ).parse(
-        await this.call("callees", { addrs: [fn.address], limit: 500 }),
-      )[0];
-      if (page?.callees == null || page.error !== undefined)
-        throw new AnalysisProtocolError(
-          `IDA callees failed: ${page?.error ?? "missing callees"}`,
-        );
-      if (page.more === true)
-        this.limitations.push(
-          "Upstream callees capped results at 500; additional callees remain unknown.",
-        );
-      coverage = {
-        ...(page.more === undefined
-          ? {
-              status: "unknown" as const,
-              reason:
-                "Upstream callees omitted an explicit truncation marker; additional callees remain unknown.",
-            }
-          : page.more
-            ? {
-                status: "partial" as const,
-                limitations: [
-                  "Upstream callees capped results at 500; additional callees remain unknown.",
-                ],
-                limited_directions: ["callees"] as const,
-              }
-            : { status: "complete" as const }),
-        discovery: IDA_CALLEE_DISCOVERY,
-      };
-      for (const item of page.callees) {
-        if ("type" in item && item.type === "external")
-          result.set(
-            item.addr,
-            identity({ address: item.addr, name: item.name }),
-          );
-        else queries.push(item.addr);
-      }
+      return { items, coverage: UNKNOWN_COVERAGE };
     }
-    const querySet = new Set(queries);
-    if (this.protocol !== "legacy" && querySet.size > 0) {
-      const rows = modernLookupBatchSchema.parse(
-        await this.call("lookup_funcs", { queries: [...querySet] }),
-      );
-      const byQuery = new Map(rows.map((row) => [row.query, row]));
-      if (
-        rows.length !== querySet.size ||
-        byQuery.size !== rows.length ||
-        rows.some((row) => !querySet.has(row.query))
-      )
-        throw new AnalysisProtocolError(
-          "IDA returned an inconsistent callee lookup batch.",
-        );
-      for (const query of querySet) {
-        const resolved = identity(
-          this.lookupFunction(query, byQuery.get(query)),
-        );
-        result.set(resolved.address, resolved);
-      }
-    } else {
-      for (const query of querySet) {
-        const resolved = identity(await this.resolve(query));
-        result.set(resolved.address, resolved);
-      }
-    }
+    const { callees } = await this.python(
+      idaHexraysCode.callees(fn.address),
+      calleesResultSchema,
+    );
     return {
-      items: [...result.values()],
-      coverage,
-      availability: { available: true },
+      items: callees.map((callee: ResolvedProcedure) => identity(callee)),
+      coverage: UNKNOWN_COVERAGE,
     };
   }
 
@@ -665,11 +312,7 @@ export class IdaOperationRunner {
         query === undefined && parameters.address !== undefined
           ? idaAddressSchema.parse(parameters.address)
           : undefined;
-      const nativePattern =
-        this.protocol === "native" && query?.mode === "literal"
-          ? nativeLiteralSearchPattern(query.pattern, query.case_sensitive)
-          : undefined;
-      const items = await this.strings(nativePattern);
+      const items = await this.strings();
       return query !== undefined
         ? this.searchItems(operation, items, query)
         : selectedAddress === undefined
@@ -702,13 +345,9 @@ export class IdaOperationRunner {
       case "procedure_pseudo_code":
         return this.pseudocode(fn);
       case "procedure_assembly":
-        return lines(await this.assembly(fn)).join("\n");
+        return (await this.assembly(fn)).join("\n");
       case "procedure_callers":
       case "procedure_callees": {
-        if (operation === "procedure_callers" && this.protocol !== "legacy")
-          throw new AnalysisProtocolError(
-            "This IDA MCP profile cannot distinguish direct callers from other code references.",
-          );
         const relationships = await this.relationships(
           fn,
           operation === "procedure_callers" ? "callers" : "callees",
@@ -719,7 +358,7 @@ export class IdaOperationRunner {
       case "read_function_instructions":
         return functionInstructionWindowSchema.parse({
           procedure: identity(fn),
-          instructions: lines(await this.assembly(fn)),
+          instructions: await this.assembly(fn),
           limitations: IDA_LIMITATIONS,
         });
       case "analyze_function":
@@ -727,8 +366,11 @@ export class IdaOperationRunner {
     }
   }
 
-  private async dossier(fn: IdaFunction): Promise<JsonValue> {
-    const asm = await this.assembly(fn);
+  private async dossier(fn: {
+    address: string;
+    name: string;
+  }): Promise<JsonValue> {
+    const assembly = await this.assembly(fn);
     const pseudocode = await this.pseudocode(fn);
     const callers = await this.relationships(fn, "callers");
     const callees = await this.relationships(fn, "callees");
@@ -736,14 +378,10 @@ export class IdaOperationRunner {
       callers.coverage,
       callees.coverage,
     );
-    const signature =
-      asm.return_type == null || asm.arguments == null
-        ? null
-        : `${asm.return_type} ${fn.name}(${asm.arguments.map((arg) => `${arg.type} ${arg.name}`).join(", ")})`;
     return functionDossierSchema.parse({
-      procedure: { ...identity(fn), signature, locals: [] },
-      pseudocode: pseudocode ?? "",
-      assembly: lines(asm),
+      procedure: { ...identity(fn), signature: null, locals: [] },
+      pseudocode,
+      assembly,
       comments: [],
       callers: callers.items,
       callees: callees.items,
@@ -755,17 +393,14 @@ export class IdaOperationRunner {
       native_api: null,
       native_value_flow: null,
       facet_availability: {
-        pseudocode:
-          pseudocode === null
-            ? { available: false, reason: "IDA did not supply pseudocode." }
-            : { available: true },
+        pseudocode: { available: true },
         assembly: { available: true },
         comments: {
           available: false,
           reason: "IDA adapter does not expose typed comments.",
         },
-        callers: callers.availability,
-        callees: callees.availability,
+        callers: { available: true },
+        callees: { available: true },
         references: {
           available: false,
           reason: "IDA adapter does not expose typed reference edges.",
@@ -784,7 +419,6 @@ export class IdaOperationRunner {
         ...IDA_LIMITATIONS,
         ...this.limitations,
         "Stack frame records are not evidence of source locals. Rendered comments do not identify regular versus inline origin.",
-        ...(pseudocode === null ? ["Pseudocode is unavailable."] : []),
       ],
     });
   }

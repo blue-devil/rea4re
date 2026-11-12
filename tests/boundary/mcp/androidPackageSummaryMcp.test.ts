@@ -444,7 +444,7 @@ it("preserves partial/unknown declarations and Unicode text while rejecting miss
       hasSubject
         ? { path: "/original.apk", sha256: "a".repeat(64), format: "apk" }
         : undefined,
-      { id: "jadx", name: "JADX", version: "0.7.1" },
+      { id: "jadx", name: "JADX", version: "0.8.0" },
       {
         operation: "inspect_android_package",
         parameters: {},
@@ -577,7 +577,7 @@ it("rejects unavailable retention, invalid selectors and cancellation before pro
 it("delivers the selected retained page in one analysis and reads it later without a provider or source APK", async () => {
   const parent = createEvidence(
     { path: "/never-reopened.apk", sha256: "a".repeat(64), format: "apk" },
-    { id: "jadx", name: "JADX", version: "0.7.1" },
+    { id: "jadx", name: "JADX", version: "0.8.0" },
     {
       operation: "inspect_android_package",
       parameters: { path: "/never-reopened.apk" },

@@ -90,8 +90,6 @@ const doctorHost = (
         ok: true,
         classification: "healthy",
       }),
-    brewHopperPath: () => Promise.resolve(undefined),
-    manualHopperPaths: () => Promise.resolve([]),
     providerInspections: () =>
       Promise.resolve([projectGhidraDoctorInspection(ghidra)]),
   });

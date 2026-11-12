@@ -109,9 +109,9 @@ describe("IDA workspace ownership before input preparation", () => {
       await symlink(root, linked);
       const { client, producer } = clientFor(linked, target);
       expect((await client.execute("health", {})).ok).toBe(true);
-      const open = producer.calls.find(({ name }) => name === "idb_open");
+      const open = producer.calls.find(({ name }) => name === "open_database");
       expect(
-        String(open?.args.input_path).startsWith(`${await realpath(root)}/`),
+        String(open?.args.path).startsWith(`${await realpath(root)}/`),
       ).toBe(true);
       expect((await client.close()).ok).toBe(true);
     },

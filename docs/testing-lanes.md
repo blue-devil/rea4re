@@ -384,46 +384,49 @@ or upgrade Java, Ghidra, .NET or native toolchains. See
 ## IDA MCP adapter
 
 `npm run verify:ida -- --target /absolute/path/to/program --procedure main`
-uses the existing `REA_IDA_MCP_CONFIG` registration. It installs no engine,
-Python package, or compiler. The target must already be open in the GUI for
-the legacy or native attached profile; the database-supervisor headless profile opens
-a digest-verified private copy. A caller-supplied fixture keeps prerequisites
-limited to the selected engine and host. `tests/conformance/ida/inventory.c`
-provides an optional small native fixture source with exported
-`rea_fixture_add` and `rea_fixture_subtract` functions. For their switching check,
-use `--second-procedure rea_fixture_subtract --second-marker='- 13'`.
+uses the existing `REA_IDA_MCP_CONFIG` registration for the official
+HexRaysSA/ida-mcp server. It installs no engine, Python package, or compiler.
+The target must already be open in the IDA GUI for the attached profile; the
+headless profile opens a digest-verified private copy in an idalib worker. A
+caller-supplied fixture keeps prerequisites limited to the selected engine and
+host. `tests/conformance/ida/inventory.c` provides an optional small native
+fixture source with exported `rea_fixture_add` and `rea_fixture_subtract`
+functions.
 
 The lane invokes the production CLI dispatcher and connects the pinned MCP
 client SDK to the production REA server. It verifies function Evidence and
 CLI/MCP parity, inventory/search, pseudocode, instructions, xrefs, malformed
-input, original-input preservation, and lifecycle cleanup. The headless
-profile also checks containing procedures, the admitted program as the
-document, address context, and feature tracing. For headless
-analysis it confirms that the owned database IDs disappear from upstream
-discovery and private workspaces are removed. For attached analysis it confirms
-the existing GUI target remains reachable with the same input identity.
-`--package-root` selects an installed/extracted REA artifact. `--report` writes
-private local observations with mode `0600`; the console summary contains no
-target paths or upstream output.
+input, original-input preservation, and lifecycle cleanup. Both modes also
+check containing procedures, the admitted program as the document, address
+context, and feature tracing. For headless analysis it confirms that the
+opened instance disappears from upstream database discovery and private
+workspaces are removed. For attached analysis it confirms the existing GUI
+target remains reachable with the same input identity. `--package-root`
+selects an installed/extracted REA artifact. `--report` writes private local
+observations with mode `0600`; the console summary contains no target paths
+or upstream output.
 
-Adapter and composition tests cover producer parsing, pagination, canonical
-entries, external callees, target switches, cancellation draining, snapshot
-replay exclusion, ownership failures, and incomplete cleanup. They do not
-establish real IDA operation. The initial real workflows cover legacy upstream
-1.4.0 on a Windows GUI and the modern supervisor at upstream commit
-`c133c3853faa111a9b00ee615c013b720d0c4acd` with Windows x64 IDA 9.3, and the
-headless profile on macOS arm64 with IDA Professional 9.1 (build 9.1.250226)
-at the same upstream commit, using `tests/conformance/ida/inventory.c` built
-with `clang -O0 -arch arm64` and the procedure `_rea_fixture_add` (Mach-O C
-symbols carry a leading underscore). Before the headless session waited out
-the transient `busy` health a worker can report right after opening, that lane
-failed intermittently on that host. Linux headless, modern attached GUI tools,
-other engine versions and architectures remain unverified; see the
-[provider guide](providers/ida-provider.md).
+Adapter and composition tests cover producer parsing, canonical entries,
+external callees, target switches, cancellation draining, snapshot replay
+exclusion, ownership failures, and incomplete cleanup against an in-memory
+producer that serves the official tool catalog. They do not establish real
+IDA operation. `npm run verify:ida` passed headless on Linux arm64 with IDA
+Professional 9.4 (idalib) at official server build 20260924.0.3 against
+`tests/conformance/ida/inventory.c` — full CLI/MCP parity, inventories,
+pseudocode/assembly/instructions, containing procedures, address context,
+feature tracing, function switching, invalid input, instance cleanup, and
+workspace removal; string and xref oracles ran without independent
+expected literals, and the GUI attach path, Windows, and other IDA
+releases remain unverified. See the
+[cutover verification record](verification/ida-hexrays-cutover-2026-11-12.md)
+and the [provider guide](providers/ida-provider.md).
 
-Native IDA MCP verification uses `"protocol": "native"` with an already-running native plugin and requires `--second-procedure other_function --second-marker unique_second_body_text` to exercise GUI function switching and a return to the first function. These options remain optional for other profiles. The literal marker must appear in the second function's pseudocode and be absent from the first. Native cloud/widget failures are reported without hidden retries.
-
-The initial Linux x64 IDA Free 9.4 run used native MCP 1.1.2 with a local navigation correction. Windows x64 verification uses **IDA Pro 9.3**, the two-function public fixture, and the shipped Windows `whoami.exe` application. The native plugin was built from upstream `c9d15d98e8a143fc74f6e14037c48f63889b6d6c`, including the merged navigation fix, with a local loopback-listener change. Production CLI/MCP parity, switching, identity and cleanup passed. Correctness and performance measurements are recorded in the [Windows native verification notes](https://github.com/morluto/rea/blob/a2e2c29b59e8775b0e6aedb09a9eb16adf32646b/experiments/analysis-efficiency/ida-native-windows.md). Stock 1.1.2 switching, native macOS, and Windows IDA Free remain unverified. See the [native bridge prerequisites](providers/ida-provider.md#optional-native-ida-mcp-bridge).
+Historical evidence for the removed mrexodia/ida-pro-mcp profiles (legacy
+attached 1.4.0 on a Windows GUI, the database supervisor at upstream commit
+`c133c3853faa111a9b00ee615c013b720d0c4acd` with Windows x64 IDA 9.3, headless
+on macOS arm64 with IDA Professional 9.1, and the 0xshlomil native bridge)
+applies only to those upstreams and is retained in the release history; it
+does not establish behavior of the official server.
 
 ## Kuna lane
 
@@ -732,7 +735,7 @@ fully skipped modules in its summary. A mixed passed/skipped inventory is
 allowed: Vitest's skip state does not establish whether a skipped module was
 required on that runner. Review the listed skips against platform and provider
 prerequisites; the inventory alone does not prove every required case ran.
-
+export REA_JADX_MCP_JAR="$PWD/_reference/apk-integration/jadx-headless-mcp-0.8.0-all.jar"
 Scheduled qualification is admitted hourly at minute 23. A forced full run at
 03:23 UTC refreshes runner and dependency drift every day. Other hourly runs
 can reuse a successful full-qualification receipt for the exact source SHA

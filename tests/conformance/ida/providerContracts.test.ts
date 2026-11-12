@@ -18,11 +18,6 @@ afterEach(async () => {
   for (const root of roots.splice(0))
     await rm(root, { recursive: true, force: true });
 });
-/** Pinned upstream tools that navigate an active IDA GUI as a side effect. */
-const GUI_NAVIGATING_TOOLS: ReadonlySet<string> = new Set([
-  "disassemble_function",
-  "decompile_function",
-]);
 
 const parametersFor = (
   operation: string,
@@ -34,24 +29,14 @@ const parametersFor = (
   return { procedure: "main" };
 };
 
-/** Operations only the headless profile declares. */
-const HEADLESS_ONLY: ReadonlySet<string> = new Set([
-  "resolve_containing_procedure",
-  "list_documents",
-]);
-
 describe.each(["attached", "headless"] as const)(
   "IDA %s caller-visible contracts",
   (mode) => {
-    const operations = IDA_OPERATIONS.filter(
-      (operation) => mode === "headless" || !HEADLESS_ONLY.has(operation),
-    );
     it("includes the baseline operations needed by this contract matrix", () => {
-      expect(operations).toContain("list_procedures");
-      if (mode === "headless")
-        expect(operations).toContain("resolve_containing_procedure");
+      expect(IDA_OPERATIONS).toContain("list_procedures");
+      expect(IDA_OPERATIONS).toContain("resolve_containing_procedure");
     });
-    it.each(operations)(
+    it.each([...IDA_OPERATIONS])(
       "serializes %s against its named advertised output contract",
       async (operation) => {
         const { root, target } = await createIdaTarget();
@@ -73,22 +58,11 @@ describe.each(["attached", "headless"] as const)(
           const parameters = parametersFor(operation);
           const execution = await client.execute(operation, parameters);
           const descriptor = idaCapabilities(
-            IDA_COMPATIBILITY_PROFILES[
-              mode === "attached" ? "legacy" : "modern"
-            ],
+            IDA_COMPATIBILITY_PROFILES[mode],
             true,
           ).find((capability) => capability.operation === operation);
-          expect(descriptor?.effects.mayShowUi).toBe(
-            producer.calls.some(({ name }) => GUI_NAVIGATING_TOOLS.has(name)),
-          );
-          if (mode === "headless" && operation === "procedure_callers") {
-            expect(execution.ok).toBe(false);
-            if (!execution.ok)
-              expect(execution.error._tag).toBe(
-                "AnalysisCapabilityUnavailableError",
-              );
-            return;
-          }
+          // execute_python reads the attached database; it never navigates the GUI.
+          expect(descriptor?.effects.mayShowUi).toBe(false);
           if (!execution.ok) throw execution.error;
           const evidence = createEvidence(target, execution.value.provider, {
             operation,

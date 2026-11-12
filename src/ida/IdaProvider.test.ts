@@ -13,6 +13,7 @@ import {
 import {
   RecordingIdaMcp,
   createIdaTarget,
+  reaOpOf,
 } from "../../tests/fixtures/idaMcp.js";
 import { IdaProvider } from "./IdaProvider.js";
 
@@ -140,8 +141,8 @@ it.each(["missing", "file", "directory", "omitted"] as const)(
         expect(
           snapshot.capabilities.find(
             ({ operation }) => operation === "procedure_callers",
-          )?.reason,
-        ).toContain("direct call edges");
+          ),
+        ).toMatchObject({ available: false });
       } else expect(snapshot.availability.status).toBe("available");
       expect((await readdir(root)).sort()).toEqual(before);
       expect(connect).not.toHaveBeenCalled();
@@ -370,11 +371,16 @@ it("applies runtime regex budgets through a bound IDA client and recovers in the
     const settings = new AnalysisSettings({});
     const producer = new RecordingIdaMcp(target, "attached");
     const value = "a".repeat(40) + "!";
-    producer.overrideCall = (name) =>
-      name === "list_strings"
+    producer.overrideCall = (name, args) =>
+      name === "execute_python" && reaOpOf(args.code) === "strings"
         ? {
-            data: [{ address: "0x3000", length: value.length, string: value }],
-            next_offset: null,
+            result: {
+              strings: [
+                { address: "0x3000", length: value.length, text: value },
+              ],
+            },
+            stdout: "",
+            stderr: "",
           }
         : undefined;
     provider = new IdaProvider(
@@ -412,14 +418,6 @@ it("applies runtime regex budgets through a bound IDA client and recovers in the
         },
       },
     });
-    const capabilities = provider
-      .capabilities()
-      .find(({ operation }) => operation === "search_strings");
-    expect(capabilities?.limitations).toContainEqual(
-      expect.stringMatching(
-        /100 ms matching deadline \(source runtime\).*256 MiB worker heap request \(source runtime\).*update_analysis_settings/iu,
-      ),
-    );
     settings.update({
       changes: [
         { setting: "regex.matching_deadline_ms", action: "set", value: 10000 },

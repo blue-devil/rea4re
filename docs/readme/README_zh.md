@@ -62,7 +62,7 @@
 
 REA 将智能体连接到分析工具，用于检查原生二进制文件、JavaScript 和 Electron 应用、.NET 程序集以及网站。你也可以在终端中使用同样的工具。分析在本机运行，结果包含支撑各项结论的证据和相关限制。
 
-设置流程会向智能体注册 REA，并安装匹配的工作流指引。原生分析可以使用已有的 Hopper、Ghidra、IDA 或 Kuna；设置流程也可以在你批准后安装 Hopper。静态 JavaScript 分析不需要原生分析引擎。
+设置流程会向智能体注册 REA，并安装匹配的工作流指引。原生分析可以使用已有的 Hopper、Ghidra、IDA 或 Kuna；在 Linux 上，设置流程可以在你批准后安装 Hopper。静态 JavaScript 分析不需要原生分析引擎。
 
 > **[访问 REA 网站](https://rea.tools/zh-CN/)**，查看设置说明、图解指南和真实案例。
 
@@ -295,14 +295,14 @@ REA 也能为 Linux 桌面应用构建环境，智能体通过截图、鼠标和
 <details>
 <summary><strong>需要 Hopper、Ghidra、IDA 或 Kuna 吗？</strong></summary>
 
-深入的原生分析需要其中一个引擎。静态 JavaScript 和 .NET 检查不需要原生分析引擎。设置流程可以在你批准后安装 Hopper；Ghidra、IDA 和 Kuna 则使用已有安装。见[提供方设置](../getting-started/installation.md#hopper)。
+深入的原生分析需要其中一个引擎。静态 JavaScript 和 .NET 检查不需要原生分析引擎。在 Linux 上，设置流程可以在你批准后安装 Hopper；Ghidra、IDA 和 Kuna 则使用已有安装。见[提供方设置](../getting-started/installation.md#hopper)。
 
 </details>
 
 <details>
 <summary><strong>需要先启动 Hopper 吗？</strong></summary>
 
-REA 会在操作需要时启动 Hopper。在 macOS 上，首次运行时可能会出现对话框，让你选择演示模式或激活许可证。见 [Hopper 启动与故障排查](../getting-started/installation.md#launcher-paths-and-troubleshooting)。
+REA 会在操作需要时启动 Hopper。Hopper 分析在 Linux 上运行，REA 会为每个分析会话选择 Hopper 提供的演示模式。见 [Hopper 启动与故障排查](../getting-started/installation.md#launcher-paths-and-troubleshooting)。
 
 </details>
 

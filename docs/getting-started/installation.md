@@ -737,13 +737,13 @@ Hopper is separate commercial software with its own license. Its free demo has
 vendor-defined limits, and a paid license is optional. REA reuses any detected
 installation and preserves Hopper during uninstall.
 
-The automated Hopper installer supports macOS 12+, subject to the minimum
-macOS version of the current Hopper release, and x86_64 hosts running
-Ubuntu 24.04+, Fedora 41+, Nobara 44+, Arch Linux, CachyOS, or Omarchy. The
-official Linux packages are x86_64-only, so setup does not offer Hopper on other
-Linux architectures; configure [Ghidra](#ghidra) there instead. REA itself runs on any
-Linux distribution with a recognized apt, dnf, or pacman package family, where
-an existing Hopper launcher is selected through `HOPPER_LAUNCHER_PATH`. Ghidra
+Hopper analysis runs on Linux only. The automated Hopper installer supports
+x86_64 hosts running Ubuntu 24.04+, Fedora 41+, Nobara 44+, Arch Linux,
+CachyOS, or Omarchy. The official Linux packages are x86_64-only, so setup does
+not offer Hopper on other Linux architectures; configure [Ghidra](#ghidra)
+there instead. REA itself runs on any Linux distribution with a recognized
+apt, dnf, or pacman package family, where an existing Hopper launcher is
+selected through `HOPPER_LAUNCHER_PATH`. Ghidra
 and IDA have their own provider-specific host requirements; Windows Ghidra uses
 the [experimental P0 boundary](../providers/windows-ghidra-p0.md).
 
@@ -761,7 +761,7 @@ for installation. Setup cannot prompt when its output is redirected or during a
 container image build. To approve Hopper installation without prompts, run
 `rea setup --yes --install-hopper`.
 
-If a Hopper request fails on macOS or Linux, the setup result's `download`
+If a Hopper request fails, the setup result's `download`
 field names the request (`release_feed`, `package` or `public_key`), its `url`,
 and the observed outcome `kind`: `http_status` with `httpStatus`, `timeout`,
 `network`, `response_too_large`, or `url_refused`. The remediation names the
@@ -780,37 +780,17 @@ complete. Release metadata and the publisher key keep a 10-second limit. A
 `timeout` failure reports the `limit` it reached (`stalled` or `deadline`), its
 `timeoutMs` and the `receivedBytes` before it stopped.
 
-On macOS, approved setup downloads the official DMG, checks its published size
-and digest, validates the application bundle, and atomically installs it to
-`~/Applications/Hopper Disassembler.app`. REA then opens Hopper so the
-operator can choose its demo mode or activate an existing license. Homebrew and
-administrator access are not used.
-
-Each Hopper release declares its own minimum macOS version, so the setup plan
-cannot confirm support before approval. Setup compares this Mac's version with
-the release metadata's `deployment_target` before downloading the DMG, and with
-the signed application's `LSMinimumSystemVersion` before copying it. If this Mac
-is older, setup fails with `incompatible_host_version`, names both versions, and
-installs nothing. Update macOS, or install a Hopper release that supports this
-macOS version yourself and set `HOPPER_LAUNCHER_PATH`. An existing Hopper
-installation is not checked against the current release's minimum.
-
 The Hopper launcher action used by REA creates a document from an executable;
 its supported command-line interface does not attach to an already-open
 document. While another live REA session owns the same target and loader
 profile, a second session reports the owning run ID instead of opening a
-duplicate document. On macOS, closing the owning REA session releases this guard;
-Hopper keeps its document open. A later REA session can therefore open another
-document for the same target. REA does not currently identify, focus, or reuse
+duplicate document. Closing the owning REA session releases this guard, and a
+later REA session can open another document for the same target. REA does not currently identify, focus, or reuse
 that existing GUI document, and the supported launcher exposes no attach or
 reuse action for it.
 
-REA currently declines saved Hopper database (`.hop`) targets on macOS because
-the native `open database` launch route does not run REA's bridge script. To
-analyze that program with REA, select its original executable as the target and
-open it through Hopper; this starts the supported bridge route. This does not
-recover database-only annotations or analysis changes. Saved-database analysis
-on Linux continues to use its supported demo-launch route.
+Saved Hopper database (`.hop`) targets use Linux's supported demo-launch
+route, which starts REA's bridge script.
 
 Hopper lease directories must be readable and owned by the current user.
 REA validates and secures an opened directory before reserving a lease. If
@@ -940,16 +920,9 @@ sessions before removing that recovery directory and retrying.
 
 ### Launcher paths and troubleshooting
 
-On macOS, REA checks executable Hopper launchers in this order: the canonical
-system application, the canonical application installed by `rea setup` under
-`~/Applications`, then other `Hopper*.app` bundles in `/Applications` and
-`~/Applications`. The Homebrew cask location is an optional `rea doctor`
-diagnostic; to use a Homebrew-installed launcher for CLI/MCP startup, set
-`HOPPER_LAUNCHER_PATH` to the path reported by doctor. REA does not run Homebrew
-while loading runtime configuration.
 Automatic discovery accepts executable regular files, including file symlinks,
 and skips directories.
-On Linux, it prefers executable `/opt/hopper/bin/Hopper`, then executable
+On Linux, REA prefers executable `/opt/hopper/bin/Hopper`, then executable
 `~/.local/share/rea/hopper/bin/Hopper`, followed by `/opt/hopper-v4/bin/hopper`
 and `/usr/bin/hopper`; if none exists, `/opt/hopper/bin/Hopper` remains the
 diagnostic fallback. `rea doctor` checks only the current platform's candidates, in the
@@ -975,17 +948,7 @@ reports `busy` at stage `launch`; `analysis_activity` describes bridge requests
 and can remain idle until the socket is ready. Cleanup work reports `busy` at
 stage `connection`.
 
-If macOS denies Apple Events, allow the application that starts REA under
-**System Settings → Privacy & Security → Automation**, then retry. REA releases
-the target reservation when the native helper reports its complete authorization
-rejection after literal argument admission. Before application handoff, REA refuses
-double quotes, backslashes, or line breaks in the final launcher path or arguments,
-with `details.launch_rejection.boundary: "argument_encoding"` and the affected source/index.
-Select literal-safe launcher/runtime paths and loader arguments, or another
-compatible provider. REA preserves original file names and evidence: a quoted
-executable name can still work when its prepared image path is literal-safe;
-database paths must themselves be representable. Other failed handoffs
-retain ownership until document closure is confirmed. If a timed-out bridge
+Failed handoffs retain ownership until document closure is confirmed. If a timed-out bridge
 becomes ready later, `close_binary` connects to that run, authenticates its
 identity, and requests document shutdown. Once its listener is ready, the bridge
 allows 30 seconds for the first connection and capability validation. After a
@@ -1006,26 +969,17 @@ need Xvfb, Python 3, X11 and XTEST; approved setup installs those dependencies
 on supported distributions. Add the curl installer's reported executable
 directory, commonly `~/.local/bin`, to your shell `PATH` if needed.
 
-REA starts Hopper when needed. On macOS, complete its demo or license prompt in
-the same user session before the first CLI/MCP operation or unattended job. Open
-Hopper manually if needed; its launcher can also bring the dialog forward.
+REA starts Hopper when needed.
 If startup reports `Cannot launch Hopper! Connection is invalid.` or waits for
 bridge readiness, check Hopper for a pending demo, license, or loader dialog.
 Complete the dialog and retry. If REA reports `cleanup_incomplete`, follow the
 retained-resource guidance below before reopening the target.
 
-On macOS, Hopper can show an `Executing Python Script...` overlay while the REA
-bridge serves an active MCP connection. Long-lived MCP clients can keep that
-connection open across agent turns, so the overlay may remain visible after the
-analysis calls finish; by itself, it does not establish a stalled startup. REA
-does not automatically idle-close a still-connected target. When the
-investigation is finished, export an Evidence bundle first if you need to keep
-the session ledger, then call `close_binary`; set `snapshot_path` to save a
-provider-neutral analysis snapshot as part of closing. A successful close
-shuts down the REA bridge and clears its overlay; REA does not control the
-macOS Hopper application lifetime.
-The Hopper GUI Cancel button's behavior for this bridge has not been verified;
-`close_binary` is the supported cleanup path.
+When the investigation is finished, export an Evidence bundle first if you
+need to keep the session ledger, then call `close_binary`; set `snapshot_path`
+to save a provider-neutral analysis snapshot as part of closing. The Hopper GUI
+Cancel button's behavior for this bridge has not been verified; `close_binary`
+is the supported cleanup path.
 
 Hopper serializes analysis requests. Cancelling a wait can leave provider work
 running, which the session reports. Successful decompilation is cached until
@@ -1075,8 +1029,8 @@ For cursor navigation, string decoding, symbol-name limits, and regex matching,
 see [Hopper analysis behavior](../guides/native/native-investigation.md#hopper-analysis-behavior).
 
 Closing or switching a target closes its bound Hopper document, shuts down REA's
-bridge and removes its temporary socket directory. The macOS Hopper application
-and unrelated documents remain open; the owned Linux demo application stops.
+bridge and removes its temporary socket directory; the owned Linux demo
+application stops.
 A `cleanup_incomplete`
 result identifies resources whose cleanup could not be verified.
 REA retains unresolved cleanup ownership and any confirmed shutdown phases.
@@ -1109,11 +1063,6 @@ automate license credentials. Licensed Hopper installations remain supported,
 but license activation is an operator-owned prerequisite rather than part of
 REA setup.
 
-macOS requires Hopper's first-run UI to be completed in the same user session
-that will run REA: choose the demo mode or activate an existing license before
-starting an unattended job. Ephemeral macOS runners therefore need a
-pre-provisioned user session or a deliberate interactive bootstrap step.
-
 When Hopper cannot start in CI, run
 `rea doctor --provider hopper --json` in the failing runner.
 Structured failures distinguish private-display dependencies, an unsupported
@@ -1137,7 +1086,11 @@ copying license secrets into logs, or killing unrelated Hopper processes.
 ## Ghidra
 
 REA connects to an existing Ghidra installation on Linux x64/arm64, macOS x64/arm64,
-or experimental Windows x64 P0.
+or experimental Windows x64 P0. Windows 11 ARM64 hosts are supported by running
+REA and its bundled native controls under an x64 Node.js process (x64 emulation);
+Ghidra itself documents Windows ARM64 through the same x86 emulation of its
+`win_x86_64` native tools. An arm64-native REA process cannot load the bundled
+x64 native controls.
 It accepts Ghidra 12.x (>=12.1) and the 64-bit full JDK declared by that installation's
 `application.java.min` and `application.java.max`. The JDK's reported platform must also
 map to the same native decompiler directory as the host: a JDK running under
@@ -1145,10 +1098,10 @@ emulation (for example x86_64 under Rosetta on Apple silicon) or reporting a
 non-host `os.name` fails the doctor
 even when it is an otherwise accepted 64-bit full JDK. Select a matching JDK
 through `JAVA_HOME`; adding another decompiler in the JVM-selected directory
-does not satisfy this host-validated admission rule. Current 12.1 releases require
+does not satisfy this host-validated admission rule. Ghidra 12.1 releases require
 JDK 21 or newer; Ghidra 12.2 declares JDK 25 or newer. Neither sets a maximum.
-The bridge is verified with Ghidra 12.1.4
-and JDK 21. Each installation must include the native decompiler for the host
+The bridge is verified with Ghidra 12.2
+and JDK 25. Each installation must include the native decompiler for the host
 architecture in `Ghidra/Features/Decompiler/os/<platform>/` or the corresponding
 `build/os/<platform>/` directory. Linux ARM64 uses `linux_arm_64`; official
 release archives may require you to build that native component separately.
@@ -1209,8 +1162,8 @@ limitations.
 Extract Ghidra and install the JDK outside REA, then export absolute paths:
 
 ```bash
-export GHIDRA_INSTALL_DIR=/absolute/path/to/ghidra_12.1.4_PUBLIC
-export JAVA_HOME=/absolute/path/to/jdk-21 # optional if java/javac are on PATH
+export GHIDRA_INSTALL_DIR=/absolute/path/to/ghidra_12.2_PUBLIC
+export JAVA_HOME=/absolute/path/to/jdk-25 # optional if java/javac are on PATH
 rea doctor --json
 rea setup
 ```
@@ -1235,8 +1188,8 @@ and any parsed properties when the selected runtime cannot be admitted.
 On Windows, configure the existing installation in PowerShell:
 
 ```powershell
-$env:GHIDRA_INSTALL_DIR = "C:\tools\ghidra_12.1.4_PUBLIC"
-$env:JAVA_HOME = "C:\Program Files\Java\jdk-21"
+$env:GHIDRA_INSTALL_DIR = "C:\tools\ghidra_12.2_PUBLIC"
+$env:JAVA_HOME = "C:\Program Files\Java\jdk-25"
 rea doctor --json
 rea providers --json
 ```
@@ -1449,7 +1402,7 @@ pseudocode is never treated as original source or Hopper-equivalent text.
 
 If `rea doctor --json` reports `native_decompiler` as missing on macOS x64,
 the extracted Ghidra archive may include the decompiler source without the
-macOS executable. For Ghidra 12.1.4, you can build it manually with an existing
+macOS executable. For Ghidra 12.2, you can build it manually with an existing
 Xcode Command Line Tools installation, `make`, and `bison`:
 
 ```bash
@@ -1464,10 +1417,10 @@ rea doctor --json
 
 The copy step requires the destination to be absent and preserves an existing
 decompiler. This recipe is specific to macOS x64: the
-[Ghidra 12.1.4 Makefile](https://github.com/NationalSecurityAgency/ghidra/blob/Ghidra_12.1.4_build/Ghidra/Features/Decompiler/src/decompile/cpp/Makefile)
+[Ghidra 12.2 Makefile](https://github.com/NationalSecurityAgency/ghidra/blob/Ghidra_12.2_build/Ghidra/Features/Decompiler/src/decompile/cpp/Makefile)
 explicitly selects `-arch x86_64` on Darwin. For a Gradle
 build, follow the matching release's
-[native component instructions](https://github.com/NationalSecurityAgency/ghidra/blob/Ghidra_12.1.4_build/GhidraDocs/GettingStarted.md#building-native-components).
+[native component instructions](https://github.com/NationalSecurityAgency/ghidra/blob/Ghidra_12.2_build/GhidraDocs/GettingStarted.md#building-native-components)
 REA accepts the matching executable under either `os/<platform>/` or
 `build/os/<platform>/`; it does not build the component during setup or diagnosis.
 
@@ -1475,7 +1428,7 @@ REA accepts the matching executable under either `os/<platform>/` or
 
 On Apple Silicon the same source build works with explicit overrides; no
 Makefile edits and no Rosetta are needed. The Darwin block in the
-[Ghidra 12.1.4 Makefile](https://github.com/NationalSecurityAgency/ghidra/blob/Ghidra_12.1.4_build/Ghidra/Features/Decompiler/src/decompile/cpp/Makefile)
+[Ghidra 12.2 Makefile](https://github.com/NationalSecurityAgency/ghidra/blob/Ghidra_12.2_build/Ghidra/Features/Decompiler/src/decompile/cpp/Makefile)
 pins `-arch x86_64`, but `ARCH_TYPE` and `OSDIR` are ordinary make variables,
 and command-line assignments replace them for every compile and link rule:
 
@@ -1758,7 +1711,7 @@ before opening a new Ghidra session. On Linux and macOS, REA chooses the first
 nonempty setting in this order: `GHIDRA_HEADLESS_MAXMEM`, `GHIDRA_MAXMEM`, then
 `2G`. The chosen value becomes the JVM's `-Xmx` argument. Use a JVM heap-size
 value such as `512M` or `2G`; an invalid value causes Java startup to fail.
-The supported Ghidra 12.1.4 Windows headless script consumes the same settings
+The supported Ghidra 12.2 Windows headless script consumes the same settings
 with the same precedence.
 
 For a small target on a constrained host:

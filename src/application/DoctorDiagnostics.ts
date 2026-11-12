@@ -152,33 +152,26 @@ const hostCheck = async (host: DoctorHost): Promise<DoctorCheck> => {
       macosMajor !== undefined &&
       macosMajor >= 12) ||
     (host.platform === "linux" && supportsReaHost(linuxDistribution)) ||
-    (host.platform === "win32" && host.architecture === "x64");
+    (host.platform === "win32" &&
+      (host.architecture === "x64" || host.architecture === "arm64"));
   const detail =
     macosVersion ??
     (linuxDistribution === undefined
       ? `${host.platform} ${host.architecture}`
       : `${linuxDistribution.id} ${linuxDistribution.versionId ?? "unknown"}`);
   return check("host", supported, detail, {
-    remediation: `REA supports macOS 12+, Linux distributions with a recognized apt, dnf, or pacman package family, and the experimental Windows x64 Ghidra P0 boundary; automated Hopper setup on Linux additionally requires ${LINUX_HOPPER_SETUP_HOSTS}.`,
+    remediation: `REA supports macOS 12+, Linux distributions with a recognized apt, dnf, or pacman package family, and the experimental Windows x64 Ghidra P0 boundary. Windows 11 ARM64 hosts run REA under an x64 Node.js process (x64 emulation); automated Hopper setup on Linux additionally requires ${LINUX_HOPPER_SETUP_HOSTS}.`,
     classification: "unsupported_host",
   });
 };
 
-const findHopper = async (host: DoctorHost): Promise<string | undefined> => {
-  if (host.configuredHopperPath !== undefined)
-    return firstExecutable(host, [host.configuredHopperPath]);
-  const discovery = hopperLauncherDiscovery(host.platform, host.homeDirectory);
-  const fixed = await firstExecutable(host, discovery.candidates);
-  if (fixed !== undefined || !discovery.probesMacApplicationBundles)
-    return fixed;
-  const renamed = await firstExecutable(host, await host.manualHopperPaths());
-  if (renamed !== undefined) return renamed;
-  const brewCandidate = await host.brewHopperPath();
-  return firstExecutable(
-    host,
-    brewCandidate === undefined ? [] : [brewCandidate],
-  );
-};
+const findHopper = async (host: DoctorHost): Promise<string | undefined> =>
+  host.configuredHopperPath !== undefined
+    ? firstExecutable(host, [host.configuredHopperPath])
+    : firstExecutable(
+        host,
+        hopperLauncherDiscovery(host.platform, host.homeDirectory).candidates,
+      );
 
 const firstExecutable = async (
   host: DoctorHost,

@@ -13,10 +13,10 @@ additional permission flag or degraded mode is required.
 
 ## Supported boundary
 
-- Windows 10+ x64 with fixed local NTFS/ReFS target and temporary volumes;
+- Windows 10+ x64, or Windows 11 ARM64 running REA under an x64 Node.js process (x64 emulation), with fixed local NTFS/ReFS target and temporary volumes;
 - Node.js 22.x (>=22.23.4), 24.x (>=24.22.1), or 26.12.1+;
-- an operator-installed Ghidra 12.x (>=12.1) distribution (verified with 12.1.4);
-- a 64-bit full JDK inside that installation's declared Java range (JDK 21 or newer, with no maximum, for current 12.1 releases);
+- an operator-installed Ghidra 12.x (>=12.1) distribution (verified with 12.2);
+- a 64-bit full JDK inside that installation's declared Java range (JDK 21 or newer for 12.1 releases, JDK 25 or newer for 12.2; no maximum);
 - an explicit native, non-managed x86, x86-64, ARMNT (Thumb-2) or ARM64 PE application/DLL, a
   [DOS MZ executable](ghidra-dos.md), or a
   [raw NMOS 6502 image](raw-binary.md#nmos-6502) with a caller-supplied entry; and
@@ -66,8 +66,8 @@ and DLLs.
 
 ```powershell
 npm install --global rea-agents
-$env:GHIDRA_INSTALL_DIR = "C:\tools\ghidra_12.1.4_PUBLIC"
-$env:JAVA_HOME = "C:\tools\jdk-21"
+$env:GHIDRA_INSTALL_DIR = "C:\tools\ghidra_12.2_PUBLIC"
+$env:JAVA_HOME = "C:\tools\jdk-25"
 $env:REA_ANALYSIS_PROVIDER = "ghidra"
 
 rea doctor --json
@@ -115,8 +115,8 @@ For MCP, register the resolved Node entry point and the same provider settings:
       "args": ["C:\\tools\\rea\\scripts\\rea.mjs", "mcp"],
       "env": {
         "REA_ANALYSIS_PROVIDER": "ghidra",
-        "GHIDRA_INSTALL_DIR": "C:\\tools\\ghidra_12.1.4_PUBLIC",
-        "JAVA_HOME": "C:\\tools\\jdk-21"
+        "GHIDRA_INSTALL_DIR": "C:\\tools\\ghidra_12.2_PUBLIC",
+        "JAVA_HOME": "C:\\tools\\jdk-25"
       }
     }
   }
@@ -170,7 +170,8 @@ mappings; the single-section ARM32 DLL cannot exercise that case.
 
 The runs used two logical CPUs, 512 MiB Node/JVM heaps, a 900-second startup
 budget, and an explicit `REA_GHIDRA_DISABLED_ANALYZERS=WindowsResourceReference`
-test configuration. Default-analyzer runs exceeded the selected startup budget;
+test configuration. That run predates the verified-build move to Ghidra 12.2;
+Windows verification against 12.2 is pending. Default-analyzer runs exceeded the selected startup budget;
 resource-reference analysis and default-configuration completion are not
 established by these results. A Microsoft-signed Coreinfo ARM64 application also
 completed focused MCP decompilation, repeated readback, source-mapped memory

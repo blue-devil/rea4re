@@ -23,16 +23,11 @@ import type { AnalysisProfileCommitment } from "../domain/analysisProfile.js";
 import { jsonValueSchema, type JsonValue } from "../domain/jsonValue.js";
 import { err, ok, type Result } from "../domain/result.js";
 import type { IdaConfiguration } from "./IdaConfiguration.js";
-import { idaCompatibilityProfile } from "./IdaConfiguration.js";
 import { createIdaDiagnosticRedactor } from "./IdaDiagnosticRedactor.js";
 import type { IdaMcpConnection } from "./IdaMcpConnection.js";
-import { nativeTools } from "./IdaNativeProtocol.js";
-import { readSettledHealth } from "./IdaBusyHealth.js";
-import { isX86OnlyTarget } from "./IdaCallGraph.js";
 import { IdaOperationRunner } from "./IdaOperationRunner.js";
 import {
   IDA_LIMITATIONS,
-  idaOperationUnavailableReason,
   type IdaOperation,
 } from "./IdaProviderCapabilities.js";
 import {
@@ -40,14 +35,15 @@ import {
   IDA_PROVIDER_IDENTITY,
 } from "./IdaProviderMetadata.js";
 import {
-  absentDatabaseCloseSchema,
-  closeDatabaseSchema,
-  databaseListSchema,
-  legacyMetadataSchema,
-  modernHealthSchema,
-  openDatabaseSchema,
-  rejectedOpenDatabaseSchema,
-} from "./IdaProtocolValues.js";
+  closeDatabaseResultSchema,
+  databaseInstancesSchema,
+  parseExecutePythonResult,
+  HEXRAYS_IDA_TOOLS,
+  identityResultSchema,
+  idaHexraysCode,
+  openDatabaseResultSchema,
+  type DatabaseInstance,
+} from "./IdaHexraysProtocol.js";
 import {
   idaFileDigest,
   IdaWorkspace,
@@ -68,37 +64,14 @@ import {
   analysisClientFailureForOperation,
 } from "../providers/AnalysisClientFailure.js";
 
-const legacyTools = [
-  "get_metadata",
-  "list_functions",
-  "list_strings",
-  "get_function_by_name",
-  "get_function_by_address",
-  "decompile_function",
-  "disassemble_function",
-  "get_callers",
-  "get_callees",
-  "get_xrefs_to",
-];
-const modernTools = [
-  "idb_open",
-  "idb_list",
-  "idb_close",
-  "server_health",
-  "list_funcs",
-  "lookup_funcs",
-  "find_regex",
-  "decompile",
-  "disasm",
-  "callees",
-  "xrefs_to",
-];
 const operationSet: ReadonlySet<string> = new Set(IDA_OPERATIONS);
 
 const isIdaOperation = (operation: string): operation is IdaOperation =>
   operationSet.has(operation);
 const wasCancelled = (options: ExecutionOptions | undefined): boolean =>
   options?.signal?.aborted === true;
+const timeoutSeconds = (timeoutMs: number): number =>
+  Math.max(1, Math.floor(timeoutMs / 1000));
 
 interface IdaOperationFailureContext {
   runner: IdaOperationRunner | undefined;
@@ -108,16 +81,14 @@ interface IdaOperationFailureContext {
   parameters: Readonly<Record<string, JsonValue>>;
 }
 
-/** Upstream session ids of inventory entries, omitting unreported ones. */
-interface UpstreamSession {
-  readonly session_id: string;
-  readonly backend: "worker" | "gui";
-  /** Upstream ownership; null when no inventory has reported it. */
-  readonly owned: boolean | null;
+/** Upstream database instances of inventory rows, omitting unreported ones. */
+interface UpstreamInstance {
+  readonly instance_id: string | null;
+  readonly backend: DatabaseInstance["backend"];
+  readonly status: DatabaseInstance["status"];
   /** Last inventoried input binding; null until upstream reports it. */
-  readonly input_path: string | null;
-  /** Last inventoried activity; null before upstream reports it. */
-  readonly is_active: boolean | null;
+  readonly path: string | null;
+  readonly error: string | null;
 }
 
 /** A failed cleanup retains its private workspace and reports the remaining resource. */
@@ -125,7 +96,7 @@ class IdaCleanupError extends ProviderAdapterError {
   constructor(
     path: string,
     cause: unknown,
-    sessions?: readonly UpstreamSession[],
+    instances?: readonly UpstreamInstance[],
   ) {
     super("ida", "close", {
       cause,
@@ -147,51 +118,28 @@ class IdaCleanupError extends ProviderAdapterError {
               ? cause.message
               : String(cause),
         workspace: path,
-        ...(sessions === undefined
+        ...(instances === undefined
           ? {}
           : {
-              upstream_sessions: {
+              upstream_instances: {
                 state: "unverified",
-                sessions: sessions.map(
-                  ({ session_id, backend, owned, input_path, is_active }) => ({
-                    session_id,
+                instances: instances.map(
+                  ({ instance_id, backend, status, path, error }) => ({
+                    instance_id,
                     backend,
-                    owned,
-                    input_path,
-                    is_active,
+                    status,
+                    path,
+                    error,
                   }),
                 ),
                 reason:
-                  "Release of upstream sessions matching the requested session ID or private input was not confirmed; input_path preserves the last observed binding and is null when no inventory has reported it. is_active preserves registry activity and is null when unknown; it does not establish process liveness. A worker outlives its supervisor and may keep running until it finishes and reaches its idle timeout; exiting REA does not stop it. A gui session belongs to an IDA instance REA does not control. An empty session_id means upstream reported none; owned is null when no inventory has reported ownership; an empty list means the requested worker's close was confirmed but no inventory has identified any remaining session.",
+                  "Release of upstream database instances matching the requested instance ID or private input was not confirmed; path preserves the last observed binding and is null when no inventory has reported it. An instance with status available, attached or current blocks release; unavailable rows carry their upstream error and are reported without blocking. A headless worker may keep running until it finishes and reaches its idle timeout; exiting REA does not stop it. A gui instance belongs to an IDA instance REA does not control. A null instance_id means upstream reported none; an empty list means the requested instance's close was confirmed but no inventory has identified any remaining instance.",
               },
             }),
       },
     });
   }
 }
-
-/**
- * A worker that is still tearing down can remain in inventory with its identity
- * already cleared: an empty `session_id`, `owned: false` and `is_active: false`,
- * while `input_path` still names the private copy. Such a row establishes no
- * live session, so the private-input arm must not report it as a blocker. The
- * owning worker is matched by its own session ID separately, and a genuine peer
- * on the same input keeps a session ID, so neither case is weakened.
- *
- * Limited to `backend: "worker"`: a gui row belongs to an IDA instance REA does
- * not control, and the observed teardown shape covers workers only, so a gui
- * row keeps blocking release whatever its flags say.
- */
-const isReleasedWorkerRow = (entry: {
-  readonly session_id: string;
-  readonly owned: boolean;
-  readonly is_active: boolean;
-  readonly backend: "worker" | "gui";
-}): boolean =>
-  entry.backend === "worker" &&
-  entry.session_id === "" &&
-  entry.owned === false &&
-  entry.is_active === false;
 
 /** Format-owner facts for a refused database/target binding, before any operation replies exist. */
 class IdaIdentityRefusal extends AnalysisProtocolError {
@@ -204,7 +152,7 @@ class IdaIdentityRefusal extends AnalysisProtocolError {
   }
 }
 
-/** Serial read-only session whose lifecycle authority excludes an attached GUI. */
+/** Serial read-only session over one official ida-mcp database instance. */
 export class IdaSessionClient implements AnalysisClient {
   #tail: Promise<void> = Promise.resolve();
   #startup: Promise<void> | undefined;
@@ -213,15 +161,12 @@ export class IdaSessionClient implements AnalysisClient {
   #closePromise: Promise<Result<null, AnalysisError>> | undefined;
   #closeFailures: WeakRef<IdaCleanupError>[] = [];
   #workspace: IdaWorkspace | undefined;
-  #database: string | undefined;
-  #databaseCloseCompleted = false;
+  #instanceId: string | undefined;
+  #instanceCloseCompleted = false;
   #openAttempted = false;
   #openCompleted = false;
   #ready = false;
-  #blockingSessions: readonly UpstreamSession[] | undefined;
-  #openRejected = false;
-  #callGraphAdvertised = false;
-  #surveyAdvertised = false;
+  #blockingInstances: readonly UpstreamInstance[] | undefined;
   #initialIdentity: string | undefined;
   #metadata: JsonValue = null;
   #lifecycle: JsonValue[] = [];
@@ -309,21 +254,6 @@ export class IdaSessionClient implements AnalysisClient {
           "This integration admits read-only analysis operations only.",
         ),
       );
-    const unavailableReason =
-      operation === "health"
-        ? undefined
-        : idaOperationUnavailableReason(
-            operation,
-            idaCompatibilityProfile(this.config),
-          );
-    if (unavailableReason !== undefined)
-      return err(
-        new AnalysisCapabilityUnavailableError(
-          "ida",
-          operation,
-          unavailableReason,
-        ),
-      );
     if (operation !== "health") {
       const parsed = parseIdaInput(operation, parameters);
       if (!parsed.ok) return parsed;
@@ -397,9 +327,6 @@ export class IdaSessionClient implements AnalysisClient {
           ...(runner.relationshipCoverage === undefined
             ? {}
             : { relationshipCoverage: runner.relationshipCoverage }),
-          ...(runner.referencesTruncated !== undefined
-            ? { referencesTruncated: runner.referencesTruncated }
-            : {}),
           locations: [
             { kind: "artifact-path", path: this.target.path },
             ...runner.locations,
@@ -415,21 +342,14 @@ export class IdaSessionClient implements AnalysisClient {
   }
 
   #runner(options: ExecutionOptions | undefined): IdaOperationRunner {
-    return new IdaOperationRunner(
-      this.connection,
-      idaCompatibilityProfile(this.config).protocol,
-      this.#database,
-      {
-        regexMatchingDeadline: this.regexSettings?.regexMatchingDeadline,
-        regexWorkerHeapRequest: this.regexSettings?.regexWorkerHeapRequest,
-        signal: options?.signal,
-        selectorOrigin: options?.selectorOrigin,
-        x86Only: isX86OnlyTarget(this.target),
-        callGraphAvailable: this.#callGraphAdvertised,
-        surveyAvailable: this.#surveyAdvertised,
-        admittedDocument: this.target.path,
-      },
-    );
+    return new IdaOperationRunner(this.connection, this.#instanceId, {
+      regexMatchingDeadline: this.regexSettings?.regexMatchingDeadline,
+      regexWorkerHeapRequest: this.regexSettings?.regexWorkerHeapRequest,
+      signal: options?.signal,
+      selectorOrigin: options?.selectorOrigin,
+      admittedDocument: this.target.path,
+      timeoutSeconds: timeoutSeconds(this.config.timeoutMs),
+    });
   }
 
   #health(metadata: JsonValue) {
@@ -438,7 +358,7 @@ export class IdaSessionClient implements AnalysisClient {
         {
           ready: true,
           mode: this.config.mode,
-          database: this.#database ?? null,
+          instance: this.#instanceId ?? null,
           upstream: this.connection.serverInfo(),
           metadata,
           lifecycle: this.#lifecycle,
@@ -667,17 +587,9 @@ export class IdaSessionClient implements AnalysisClient {
 
   async #initialize(): Promise<void> {
     const tools = new Set(await this.connection.connect());
-    this.#callGraphAdvertised = tools.has("callgraph");
-    this.#surveyAdvertised = tools.has("survey_binary");
-    const profile = idaCompatibilityProfile(this.config);
-    const expected = {
-      native: nativeTools,
-      legacy: legacyTools,
-      modern: modernTools,
-    }[profile.protocol];
-    const missing = expected.filter((name) => !tools.has(name));
+    const missing = HEXRAYS_IDA_TOOLS.filter((name) => !tools.has(name));
     if (missing.length > 0) {
-      const summary = `IDA MCP ${profile.diagnosticLabel} compatibility profile is missing tools: ${missing.join(", ")}. Native attached mode requires the native IDA MCP tool catalog; legacy attached mode requires the legacy 1.4 profile; headless mode requires the database supervisor profile. See docs/providers/ida-provider.md.`;
+      const summary = `IDA MCP is missing required official ida-mcp tools: ${missing.join(", ")}. See docs/providers/ida-provider.md.`;
       // The caller cannot act on a profile mismatch it never sees, so the
       // missing names travel as adapter diagnostics rather than a bare message.
       throw new ProviderAdapterError("ida", "initialize", {
@@ -685,10 +597,10 @@ export class IdaSessionClient implements AnalysisClient {
         diagnostics: {
           reason: summary,
           mode: this.config.mode,
-          expected_profile: profile.diagnosticIdentity,
+          expected_profile: "hexrays",
           missing_tools: [...missing],
           recovery:
-            "Install an IDA MCP build that serves the selected profile; see docs/providers/ida-provider.md.",
+            "Install the official HexRaysSA/ida-mcp server; see docs/providers/ida-provider.md.",
         },
       });
     }
@@ -699,91 +611,96 @@ export class IdaSessionClient implements AnalysisClient {
       );
       await this.#workspace.copyInput();
       this.#openAttempted = true;
-      const raw = await this.connection.call("idb_open", {
-        input_path: this.#workspace.inputPath,
-        mode: "force_headless",
-        run_auto_analysis: true,
-        build_caches: true,
-        init_hexrays: true,
-        preferred_session_id: this.#workspace.sessionId,
+      const raw = await this.connection.call("open_database", {
+        path: this.#workspace.inputPath,
+        set_current: true,
       });
       this.#openCompleted = true;
-      // A completed but malformed/positive open may still own a live Worker.
-      // Only an explicit producer rejection keeps the old no-worker branch.
-      this.#openRejected = rejectedOpenDatabaseSchema.safeParse(raw).success;
       this.#lifecycle.push(raw);
-      const opened = openDatabaseSchema.parse(raw);
-      if (
-        !sameIdaHostPath(opened.session.input_path, this.#workspace.inputPath)
-      )
+      const opened = openDatabaseResultSchema.parse(raw);
+      if (opened.backend === "gui")
         throw new IdaIdentityRefusal(
-          "IDA opened a different input than the private admitted target copy.",
-          "Check the selected input and upstream worker binding. Retry only after retained private-worker cleanup is confirmed.",
-          "opened_input",
+          "IDA opened the private input in a GUI instance instead of a headless worker.",
+          "Configure headless mode against an ida-mcp server that runs headless workers, or open the original target in the IDA GUI and use attached mode.",
+          "headless_backend",
         );
-      if (opened.session.session_id !== this.#workspace.sessionId)
-        throw new IdaIdentityRefusal(
-          "IDA returned an adopted or unexpected session instead of the requested private worker.",
-          "Use an IDA supervisor that honors the requested private worker session ID. Confirm retained cleanup before reopening the target.",
-          "worker_session",
-        );
-      const inventory = databaseListSchema.parse(
-        await this.connection.call("idb_list", {}),
+      this.#instanceId = opened.instance_id;
+      const inventory = databaseInstancesSchema.parse(
+        await this.connection.call("list_databases", {}),
       );
       this.#lifecycle.push(jsonValueSchema.parse(inventory));
       const workspace = this.#workspace;
-      this.#recordBlockingSessions(
-        inventory.sessions.filter(
+      this.#recordBlockingInstances(
+        inventory.instances.filter(
           (entry) =>
-            entry.session_id === workspace.sessionId ||
-            sameIdaHostPath(entry.input_path, workspace.inputPath),
+            entry.status !== "unavailable" &&
+            sameIdaHostPath(entry.path, workspace.inputPath),
         ),
       );
-      const entry = inventory.sessions.find(
-        ({ session_id }) => session_id === opened.session.session_id,
+      const entry = inventory.instances.find(
+        ({ instance_id }) => instance_id === opened.instance_id,
       );
       if (
-        entry?.owned !== true ||
-        entry.backend !== "worker" ||
-        entry.is_active !== true ||
-        !sameIdaHostPath(entry.input_path, this.#workspace.inputPath)
+        entry === undefined ||
+        entry.status === "unavailable" ||
+        entry.backend !== opened.backend ||
+        !sameIdaHostPath(entry.path, workspace.inputPath)
       )
         throw new IdaIdentityRefusal(
-          "IDA did not return an active owned headless worker for the private input copy.",
-          "Configure the supervisor to return an active owned worker for the private input. Confirm retained cleanup before reopening the target.",
-          "owned_worker_binding",
+          "IDA did not report the opened headless instance in its database inventory.",
+          "Use an ida-mcp server that lists opened databases. Confirm retained cleanup before reopening the target.",
+          "instance_inventory",
         );
-      this.#database = opened.session.session_id;
+    } else {
+      const raw = await this.connection.call("open_database", {
+        path: this.target.path,
+        set_current: true,
+      });
+      this.#openCompleted = true;
+      this.#openAttempted = true;
+      this.#lifecycle.push(raw);
+      const opened = openDatabaseResultSchema.parse(raw);
+      if (opened.backend !== "gui")
+        throw new IdaIdentityRefusal(
+          `The ida-mcp server opened ${this.target.path} in a headless worker instead of attaching to the IDA GUI.`,
+          "Open the selected target in the IDA GUI, or configure headless mode and reopen the target through REA.",
+          "attached_backend",
+        );
+      this.#instanceId = opened.instance_id;
     }
     this.#ready = true;
-  }
-
-  async #nativeMetadata(signal?: AbortSignal): Promise<JsonValue> {
-    if (this.connection.readResource === undefined)
-      throw new AnalysisProtocolError(
-        "Native IDA MCP requires resources/read for recorded input metadata.",
-      );
-    return this.connection.readResource("ida://idb/metadata", { signal });
   }
 
   async #observe(
     options?: ExecutionOptions,
     onObserved?: (metadata: JsonValue) => void,
   ): Promise<JsonValue> {
+    if (this.#instanceId === undefined)
+      throw new IdaIdentityRefusal(
+        "IDA session has no database instance binding.",
+        "Close the REA analysis session and reopen the selected target through the configured ida-mcp server.",
+        "instance_binding",
+      );
+    const args = {
+      code: idaHexraysCode.identity(),
+      instance_id: this.#instanceId,
+      timeout: timeoutSeconds(this.config.timeoutMs),
+    };
+    const raw = parseExecutePythonResult(
+      await this.connection.call("execute_python", args, {
+        signal: options?.signal,
+      }),
+    );
+    const metadata = identityResultSchema.parse(raw);
+    const observed: JsonValue = jsonValueSchema.parse(metadata);
+    this.#metadata = observed;
+    onObserved?.(observed);
     let identity: string;
     if (this.config.mode === "attached") {
-      const raw =
-        idaCompatibilityProfile(this.config).protocol === "native"
-          ? await this.#nativeMetadata(options?.signal)
-          : await this.connection.call(
-              "get_metadata",
-              {},
-              { signal: options?.signal },
-            );
-      const metadata = legacyMetadataSchema.parse(raw);
-      this.#metadata = raw;
-      onObserved?.(raw);
-      if (metadata.sha256.toLowerCase() !== this.target.sha256.toLowerCase())
+      if (
+        metadata.sha256 === null ||
+        metadata.sha256.toLowerCase() !== this.target.sha256.toLowerCase()
+      )
         throw new IdaIdentityRefusal(
           `The attached IDA input SHA-256 does not match the selected target ${this.target.path}; open that target in IDA or use headless mode.`,
           "Open the selected original input in IDA, or configure headless mode and reopen the target through REA.",
@@ -795,22 +712,14 @@ export class IdaSessionClient implements AnalysisClient {
         metadata.base,
       ]);
     } else {
-      if (this.#database === undefined || this.#workspace === undefined)
+      if (this.#workspace === undefined)
         throw new IdaIdentityRefusal(
-          "IDA headless session has no database binding.",
-          "Close the REA analysis session and reopen the selected target using the configured headless supervisor.",
-          "database_binding",
+          "IDA headless session has no private workspace binding.",
+          "Close the REA analysis session, confirm private-worker cleanup, then reopen the selected original target.",
+          "headless_input",
         );
-      const raw = await readSettledHealth(this.connection, {
-        database: this.#database,
-        timeoutMs: this.config.timeoutMs,
-        signal: options?.signal,
-      });
-      const metadata = modernHealthSchema.parse(raw);
-      this.#metadata = raw;
-      onObserved?.(raw);
       if (
-        !sameIdaHostPath(metadata.input_path, this.#workspace.inputPath) ||
+        !sameIdaHostPath(metadata.path, this.#workspace.inputPath) ||
         (await idaFileDigest(this.#workspace.inputPath)) !==
           this.#workspace.inputSha256
       )
@@ -819,27 +728,10 @@ export class IdaSessionClient implements AnalysisClient {
           "Close the REA analysis session, confirm private-worker cleanup, then reopen the selected original target.",
           "headless_input",
         );
-      if (metadata.auto_analysis_ready !== true)
-        throw new AnalysisCapabilityUnavailableError(
-          "ida",
-          "server_health",
-          metadata.auto_analysis_ready === false
-            ? "IDA auto-analysis is incomplete."
-            : "IDA auto-analysis readiness is unknown.",
-          {
-            retryable: metadata.auto_analysis_ready === false,
-            remediationAction:
-              metadata.auto_analysis_ready === false
-                ? "Wait for IDA auto-analysis to complete, then retry the request."
-                : "Inspect the upstream IDA worker's analysis readiness before retrying; unknown readiness does not establish active analysis.",
-            diagnostics: { auto_analysis_ready: metadata.auto_analysis_ready },
-          },
-        );
       identity = JSON.stringify([
-        this.#database,
-        metadata.input_path,
-        metadata.idb_path,
-        metadata.imagebase,
+        this.#instanceId,
+        metadata.path,
+        metadata.base,
       ]);
     }
     if (
@@ -866,80 +758,63 @@ export class IdaSessionClient implements AnalysisClient {
   }
 
   /**
-   * Upstream sessions whose release cleanup has not confirmed: the entries
+   * Upstream instances whose release cleanup has not confirmed: the entries
    * the latest successful inventory found blocking release; else the
-   * requested private worker until its close is confirmed, and then none
+   * requested headless instance until its close is confirmed, and then none
    * known.
    */
-  #unreleasedSessions(): readonly UpstreamSession[] | undefined {
-    if (this.#blockingSessions !== undefined) return this.#blockingSessions;
-    if (
-      !this.#openAttempted ||
-      this.#workspace === undefined ||
-      this.#openRejected
-    )
+  #unreleasedInstances(): readonly UpstreamInstance[] | undefined {
+    if (this.#blockingInstances !== undefined) return this.#blockingInstances;
+    if (!this.#openAttempted || this.config.mode !== "headless")
       return undefined;
-    return this.#databaseCloseCompleted
+    return this.#instanceCloseCompleted
       ? []
       : [
           {
-            session_id: this.#workspace.sessionId,
-            backend: "worker",
-            owned: null,
-            input_path: null,
-            is_active: null,
+            instance_id: this.#instanceId ?? null,
+            backend: "idalib",
+            status: "attached",
+            path: this.#workspace?.inputPath ?? null,
+            error: null,
           },
         ];
   }
 
-  /** Drop a session whose release upstream confirmed, keeping other blockers. */
-  #forgetReleasedSession(sessionId: string): void {
-    const remaining = this.#blockingSessions?.filter(
-      ({ session_id }) => session_id !== sessionId,
+  /** Drop an instance whose release upstream confirmed, keeping other blockers. */
+  #forgetReleasedInstance(instanceId: string): void {
+    const remaining = this.#blockingInstances?.filter(
+      ({ instance_id }) => instance_id !== instanceId,
     );
-    this.#blockingSessions =
+    this.#blockingInstances =
       remaining !== undefined && remaining.length > 0 ? remaining : undefined;
   }
 
   /** Replace blocker evidence from a successful inventory; true when blocked. */
-  #recordBlockingSessions(
-    entries: readonly (UpstreamSession & { readonly owned: boolean })[],
-  ): boolean {
-    this.#blockingSessions =
-      entries.length > 0
-        ? entries.map(
-            ({ session_id, backend, owned, input_path, is_active }) => ({
-              session_id,
-              backend,
-              owned,
-              input_path,
-              is_active,
-            }),
-          )
+  #recordBlockingInstances(entries: readonly DatabaseInstance[]): boolean {
+    const blocking = entries.filter(({ status }) => status !== "unavailable");
+    this.#blockingInstances =
+      blocking.length > 0
+        ? blocking.map(({ instance_id, backend, status, path, error }) => ({
+            instance_id: instance_id ?? null,
+            backend,
+            status,
+            path,
+            error: error ?? null,
+          }))
         : undefined;
-    return entries.length > 0;
+    return blocking.length > 0;
   }
 
-  async #closeDatabase(database: string): Promise<void> {
-    const response = await this.connection.call("idb_close", {
-      database,
-      save: false,
-    });
-    const closed = closeDatabaseSchema.safeParse(response);
-    if (!closed.success) {
-      if (!absentDatabaseCloseSchema(database).safeParse(response).success)
-        throw closed.error;
-      return;
-    }
-    if (
-      closed.data.session_id !== database ||
-      closed.data.saved === true ||
-      closed.data.owned !== true ||
-      closed.data.backend !== "worker"
-    )
-      throw new AnalysisProtocolError(
-        "IDA database close did not confirm the requested owned, unsaved session release.",
-      );
+  /**
+   * Close one instance. A `closed: false` reply is not itself a failure: the
+   * instance may already have been reaped. Release is proven afterwards by
+   * the inventory absence check, so only transport and malformed replies fail
+   * here.
+   */
+  async #closeInstance(instanceId: string): Promise<void> {
+    closeDatabaseResultSchema.parse(
+      await this.connection.call("close_database", { instance_id: instanceId }),
+    );
   }
 
   async #closeOnce(): Promise<Result<null, AnalysisError>> {
@@ -947,71 +822,68 @@ export class IdaSessionClient implements AnalysisClient {
     await this.#tail;
     if (this.#closed) return ok(null);
     try {
-      if (this.#workspace !== undefined && this.#openAttempted) {
-        if (this.#database === undefined) {
-          const inventory = databaseListSchema.parse(
-            await this.connection.call("idb_list", {}),
+      if (this.config.mode === "headless" && this.#openAttempted) {
+        if (this.#instanceId === undefined) {
+          // A completed open whose reply could not be decoded may still own a
+          // worker: only an inventory without a live private-input instance
+          // proves otherwise. An unavailable inventory keeps the workspace.
+          const inventory = databaseInstancesSchema.parse(
+            await this.connection.call("list_databases", {}),
           );
           const workspace = this.#workspace;
-          this.#database = inventory.sessions.find(
-            (entry) =>
-              entry.owned &&
-              entry.backend === "worker" &&
-              entry.session_id === workspace.sessionId &&
-              sameIdaHostPath(entry.input_path, workspace.inputPath),
-          )?.session_id;
-          // Every same-input session and any entry under the requested ID,
-          // whatever its input, stays reported until a later successful
-          // inventory confirms release.
-          const blocked = this.#recordBlockingSessions(
-            inventory.sessions.filter(
-              (entry) =>
-                entry.session_id === workspace.sessionId ||
-                sameIdaHostPath(entry.input_path, workspace.inputPath),
-            ),
-          );
-          if (this.#database === undefined && blocked)
-            throw new AnalysisProtocolError(
-              "A registered session still matches the requested ID or private input without a verified private worker binding; the workspace was retained.",
-            );
           if (
-            this.#database === undefined &&
-            this.#openCompleted &&
-            !this.#openRejected
+            workspace !== undefined &&
+            this.#recordBlockingInstances(
+              inventory.instances.filter(
+                (entry) =>
+                  entry.status !== "unavailable" &&
+                  sameIdaHostPath(entry.path, workspace.inputPath),
+              ),
+            )
           )
             throw new AnalysisProtocolError(
-              "IDA open returned without a verified private worker binding. An empty session inventory does not prove that its Worker exited; the private workspace was retained.",
+              "A live instance still matches the private input without a verified instance binding; the workspace was retained.",
             );
-        }
-        if (this.#database !== undefined) {
-          if (!this.#databaseCloseCompleted) {
-            await this.#closeDatabase(this.#database);
-            this.#databaseCloseCompleted = true;
-            this.#forgetReleasedSession(this.#database);
+          if (this.#openCompleted)
+            throw new AnalysisProtocolError(
+              "IDA open returned without a verified instance binding. An empty inventory does not prove the worker exited; the private workspace was retained.",
+            );
+        } else {
+          if (!this.#instanceCloseCompleted) {
+            await this.#closeInstance(this.#instanceId);
+            this.#instanceCloseCompleted = true;
+            this.#forgetReleasedInstance(this.#instanceId);
           }
-          const inventory = databaseListSchema.parse(
-            await this.connection.call("idb_list", {}),
+          const inventory = databaseInstancesSchema.parse(
+            await this.connection.call("list_databases", {}),
           );
-          const remaining = inventory.sessions.filter(
-            (entry) =>
-              !isReleasedWorkerRow(entry) &&
-              (entry.session_id === this.#database ||
-                sameIdaHostPath(
-                  entry.input_path,
-                  this.#workspace?.inputPath ?? "",
-                )),
-          );
-          if (this.#recordBlockingSessions(remaining))
+          const instanceId = this.#instanceId;
+          if (
+            this.#recordBlockingInstances(
+              inventory.instances.filter(
+                (entry) =>
+                  entry.status !== "unavailable" &&
+                  (entry.instance_id === instanceId ||
+                    (this.#workspace !== undefined &&
+                      sameIdaHostPath(entry.path, this.#workspace.inputPath))),
+              ),
+            )
+          )
             throw new AnalysisProtocolError(
               "IDA worker remains registered after close.",
             );
-          this.#database = undefined;
+          this.#instanceId = undefined;
         }
         if (!this.#openCompleted)
           throw new AnalysisProtocolError(
             "IDA database open did not return a completed response. Worker inventory cannot prove that the request has stopped; the private workspace was retained.",
           );
         this.#openAttempted = false;
+      } else if (this.#instanceId !== undefined) {
+        // Attached mode: release REA's lease only. The GUI database stays open
+        // (upstream contract), and save_database is never called.
+        await this.#closeInstance(this.#instanceId);
+        this.#instanceId = undefined;
       }
       await this.connection.close();
       await this.#workspace?.remove();
@@ -1026,7 +898,7 @@ export class IdaSessionClient implements AnalysisClient {
       const failure = new IdaCleanupError(
         path,
         cause,
-        this.#unreleasedSessions(),
+        this.#unreleasedInstances(),
       );
       const client = this;
       failure.bindCleanupResourceOwner({

@@ -15,23 +15,6 @@ const hasCompleteLauncherOutput = (outcome: HopperLauncherOutcome): boolean =>
   outcome.stdout.retained_bytes === 0;
 
 /**
- * Hopper's native helper sends activate before its open-document Apple event.
- * Recognize its explicit authorization rejection. The launcher must separately
- * establish that caller arguments could not alter the generated AppleScript.
- * Other script errors, signals, and incomplete output leave ownership unknown.
- */
-export const nativeHopperLaunchWasDenied = (
-  outcome: HopperLauncherOutcome | undefined,
-): outcome is HopperLauncherOutcome =>
-  outcome !== undefined &&
-  outcome.exit_code === 2 &&
-  outcome.signal === null &&
-  hasCompleteLauncherOutput(outcome) &&
-  /^Cannot launch Hopper!\r?\nNot authorized to send Apple events to [^\r\n]+\.\r?\n?$/u.test(
-    outcome.stderr.text,
-  );
-
-/**
  * Recognize the launcher's complete Spotlight diagnostic for actionable setup
  * guidance. Custom launchers may forward this report after a handoff, so the
  * report does not establish whether a document exists or release ownership.

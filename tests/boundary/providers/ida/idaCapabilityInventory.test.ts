@@ -31,7 +31,7 @@ it("retains network cleanup effects in session discovery for lifecycle tools", (
       open: true,
       kind: "executable",
       capabilities: providerCapabilitySets(
-        idaCapabilities(IDA_COMPATIBILITY_PROFILES.modern, false),
+        idaCapabilities(IDA_COMPATIBILITY_PROFILES.headless, false),
       ),
     },
     enabledPolicy,
@@ -56,7 +56,7 @@ it("retains network cleanup effects in session discovery for lifecycle tools", (
 });
 
 it("keeps retryable IDA effects in composed discovery while preserving unavailability", () => {
-  const ida = idaCapabilities(IDA_COMPATIBILITY_PROFILES.legacy, false);
+  const ida = idaCapabilities(IDA_COMPATIBILITY_PROFILES.attached, false);
   const statusFor = (runtimeUnavailable: boolean) => ({
     open: true,
     kind: "executable",
@@ -82,7 +82,7 @@ it("keeps retryable IDA effects in composed discovery while preserving unavailab
   expect(retryable).toMatchObject({
     available: false,
     reason: "provider_unavailable",
-    effects: { accessesNetwork: true, changesUiState: true },
+    effects: { accessesNetwork: true, changesUiState: false },
     annotations: { open_world: true },
   });
   const blocked = buildCapabilityInventory(
@@ -97,9 +97,8 @@ it("keeps retryable IDA effects in composed discovery while preserving unavailab
 });
 
 it.each([
-  ["legacy", false],
-  ["native", true],
-  ["modern", true],
+  ["attached", false],
+  ["headless", true],
 ] as const)(
   "covers IDA provider effects in the global audit (%s, stdio=%s)",
   (profileName, stdio) => {
@@ -129,7 +128,7 @@ it.each([false, true])(
       kind: "executable",
       capabilities: providerCapabilitySets(
         idaCapabilities(
-          IDA_COMPATIBILITY_PROFILES[showUi ? "legacy" : "modern"],
+          IDA_COMPATIBILITY_PROFILES[showUi ? "headless" : "attached"],
           false,
         ),
       ),
@@ -147,7 +146,7 @@ it.each([false, true])(
     ]) {
       expect(entries.find((entry) => entry.name === name)).toMatchObject({
         effects: {
-          changesUiState: showUi,
+          changesUiState: false,
           accessesNetwork: true,
         },
         annotations: { open_world: true },
@@ -168,7 +167,7 @@ it("omits effects of IDA calls hidden behind unavailable workflow prerequisites"
       open: true,
       kind: "executable",
       capabilities: providerCapabilitySets(
-        idaCapabilities(IDA_COMPATIBILITY_PROFILES.legacy, false),
+        idaCapabilities(IDA_COMPATIBILITY_PROFILES.attached, false),
       ),
     },
     enabledPolicy,
@@ -195,7 +194,7 @@ it("omits effects of IDA calls hidden behind unavailable workflow prerequisites"
 });
 
 it("advertises reachable IDA calls through native UI tracing", () => {
-  const ida = idaCapabilities(IDA_COMPATIBILITY_PROFILES.legacy, false);
+  const ida = idaCapabilities(IDA_COMPATIBILITY_PROFILES.attached, false);
   const source = ida[0];
   if (source === undefined) throw new Error("IDA capability fixture is empty");
   const metadata = {
@@ -245,7 +244,7 @@ it("advertises reachable IDA calls through native UI tracing", () => {
 });
 
 it("includes reachable IDA document and procedure effects in address-context discovery", () => {
-  const ida = idaCapabilities(IDA_COMPATIBILITY_PROFILES.modern, false);
+  const ida = idaCapabilities(IDA_COMPATIBILITY_PROFILES.headless, false);
   expect(TOOL_EFFECTS.inspect_address_context).toMatchObject({
     accessesNetwork: true,
     launchesProcess: true,
@@ -301,26 +300,26 @@ it("includes reachable IDA document and procedure effects in address-context dis
   });
 });
 
-it("keeps native attached UI effects limited to the operations that show them", () => {
+it("keeps IDA free of UI effects in every mode", () => {
   const input = {
     open: true,
     kind: "executable",
     capabilities: providerCapabilitySets(
-      idaCapabilities(IDA_COMPATIBILITY_PROFILES.native, true),
+      idaCapabilities(IDA_COMPATIBILITY_PROFILES.headless, true),
     ),
   };
   const entries = buildCapabilityInventory(input, enabledPolicy);
-  for (const [name, showUi] of [
-    ["procedure_pseudo_code", true],
-    ["analyze_function", true],
-    ["procedure_assembly", false],
-    ["read_function_instructions", false],
-  ] as const) {
+  for (const name of [
+    "procedure_pseudo_code",
+    "analyze_function",
+    "procedure_assembly",
+    "read_function_instructions",
+  ]) {
     expect(
       entries.find((entry) => entry.name === name),
       name,
     ).toMatchObject({
-      effects: { changesUiState: showUi, accessesNetwork: true },
+      effects: { changesUiState: false, accessesNetwork: true },
       annotations: { open_world: true },
     });
   }

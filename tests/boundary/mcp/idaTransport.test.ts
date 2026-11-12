@@ -37,7 +37,6 @@ type IdaTransportFixtureOptions = {
   readonly cycle?: boolean;
   readonly native?: boolean;
   readonly toolResult?: JsonValue;
-  readonly resourceResponseText?: string;
   readonly toolRpcError?: {
     readonly code: number;
     readonly message: string;
@@ -85,37 +84,9 @@ const fixtureResponse = (
                 }
               : {}),
         }
-      : input.method === "resources/read"
-        ? {
-            contents: [
-              {
-                uri: "ida://idb/metadata",
-                mimeType: "application/json",
-                text:
-                  options.resourceResponseText ??
-                  JSON.stringify({
-                    path: "/fixture/input.i64",
-                    sha256: "a".repeat(64),
-                    base: "0x1000",
-                    module: "input",
-                  }),
-              },
-            ],
-          }
-        : options.toolResult !== undefined
-          ? options.toolResult
-          : options.native
-            ? {
-                content: [
-                  {
-                    type: "text",
-                    text: JSON.stringify([{ observed: true }]),
-                  },
-                ],
-                structuredContent: { result: [], _output_truncated: true },
-              }
-            : { content: [], structuredContent: { observed: true } };
-
+      : options.toolResult !== undefined
+        ? options.toolResult
+        : { content: [], structuredContent: { observed: true } };
 const fixture = async (options: IdaTransportFixtureOptions = {}) => {
   const {
     redirectUrl,
@@ -184,7 +155,6 @@ const fixture = async (options: IdaTransportFixtureOptions = {}) => {
       url: `http://127.0.0.1:${address.port}/mcp`,
       headers: configurationHeaders,
       mode: native ? "attached" : "headless",
-      ...(native ? { protocol: "native" as const } : {}),
       timeoutMs: 2000,
     },
     {},
@@ -258,18 +228,6 @@ it("rejects nonterminating SDK pagination instead of returning a partial tool ca
   expect(
     methods.filter((method) => method === "tools/list").length,
   ).toBeGreaterThan(2);
-});
-
-it("reads native metadata resources and complete JSON text through the real SDK transport", async () => {
-  const { connection, methods } = await fixture({ native: true });
-  expect(await connection.connect()).toEqual(["first", "second"]);
-  expect(await connection.call("first", {})).toEqual([{ observed: true }]);
-  expect(await connection.readResource?.("ida://idb/metadata")).toMatchObject({
-    path: "/fixture/input.i64",
-    sha256: "a".repeat(64),
-  });
-  await expect(connection.readResource?.("ida://other")).rejects.toThrow();
-  expect(methods).toContain("resources/read");
 });
 
 it("accepts a legacy stdio reply over the SDK default while staying bounded", async () => {
@@ -965,30 +923,6 @@ it.each([
     });
     expect(inspected).not.toContain(body);
     expect(inspected).not.toContain("format-fixture-secret");
-  },
-);
-
-it.each(["native tool", "resource"] as const)(
-  "does not retain the producer JSON parse cause for %s text",
-  async (source) => {
-    const malformedText = '["token",x]';
-    const { connection } = await fixture({
-      native: true,
-      configurationHeaders: { Authorization: "Bearer token" },
-      ...(source === "native tool"
-        ? { toolResult: { content: [{ type: "text", text: malformedText }] } }
-        : { resourceResponseText: malformedText }),
-    });
-    await connection.connect();
-    const failure = await (
-      source === "native tool"
-        ? connection.call("first", {})
-        : connection.readResource?.("ida://idb/metadata")
-    )?.catch((cause: unknown) => cause);
-    expect(failure).toBeInstanceOf(AnalysisProtocolError);
-    expect(inspect(failure, { depth: null, showHidden: true })).not.toContain(
-      "token",
-    );
   },
 );
 

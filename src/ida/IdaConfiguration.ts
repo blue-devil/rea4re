@@ -42,7 +42,6 @@ const common = {
     })
     .optional(),
   mode: z.enum(["attached", "headless"]).default("attached"),
-  protocol: z.literal("native").optional(),
   timeoutMs: z
     .int()
     .min(MIN_IDA_REQUEST_TIMEOUT_MS)
@@ -53,38 +52,33 @@ const common = {
     .refine(isAbsolute, "workspaceRoot must be absolute on the REA host")
     .optional(),
 };
-const registrationSchema = z
-  .union([
-    z
-      .object({
-        ...common,
-        type: z.literal("stdio").optional(),
-        command: z.string().min(1),
-        args: z.array(z.string()).default([]),
-        env: jsonRecordSchema(z.string()).default({}),
-      })
-      .strict(),
-    z
-      .object({
-        ...common,
-        type: z.literal("http").optional(),
-        url: z.url().refine((value) => {
-          const url = new URL(value);
-          return (
-            ["http:", "https:"].includes(url.protocol) &&
-            LOCAL_IDA_HTTP_HOSTS.has(url.hostname) &&
-            url.username === "" &&
-            url.password === ""
-          );
-        }, "IDA MCP must use a local HTTP endpoint without URL credentials"),
-        headers: jsonRecordSchema(z.string()).default({}),
-      })
-      .strict(),
-  ])
-  .refine(
-    (config) => config.protocol !== "native" || config.mode === "attached",
-    "The native IDA MCP protocol requires attached mode",
-  );
+const registrationSchema = z.union([
+  z
+    .object({
+      ...common,
+      type: z.literal("stdio").optional(),
+      command: z.string().min(1),
+      args: z.array(z.string()).default([]),
+      env: jsonRecordSchema(z.string()).default({}),
+    })
+    .strict(),
+  z
+    .object({
+      ...common,
+      type: z.literal("http").optional(),
+      url: z.url().refine((value) => {
+        const url = new URL(value);
+        return (
+          ["http:", "https:"].includes(url.protocol) &&
+          LOCAL_IDA_HTTP_HOSTS.has(url.hostname) &&
+          url.username === "" &&
+          url.password === ""
+        );
+      }, "IDA MCP must use a local HTTP endpoint without URL credentials"),
+      headers: jsonRecordSchema(z.string()).default({}),
+    })
+    .strict(),
+]);
 
 /** An upstream MCP registration plus REA's database lifecycle selection. */
 export type IdaConfiguration = z.infer<typeof registrationSchema>;
@@ -102,38 +96,26 @@ const registrationConstraint = (
 
 /** Resolved compatibility facts; persisted identities and diagnostics intentionally differ. */
 export const IDA_COMPATIBILITY_PROFILES = {
-  legacy: {
-    protocol: "legacy",
+  attached: {
     mode: "attached",
-    identity: "legacy-1.4",
-    diagnosticIdentity: "legacy-1.4",
+    identity: "hexrays-ida-mcp",
+    diagnosticIdentity: "hexrays",
     diagnosticLabel: "attached",
   },
-  modern: {
-    protocol: "modern",
+  headless: {
     mode: "headless",
-    identity: "database-supervisor",
-    diagnosticIdentity: "database-supervisor",
+    identity: "hexrays-ida-mcp",
+    diagnosticIdentity: "hexrays",
     diagnosticLabel: "headless",
-  },
-  native: {
-    protocol: "native",
-    mode: "attached",
-    identity: "native-ida-mcp",
-    diagnosticIdentity: "native",
-    diagnosticLabel: "native attached",
   },
 } as const;
 export type IdaCompatibilityProfile =
   (typeof IDA_COMPATIBILITY_PROFILES)[keyof typeof IDA_COMPATIBILITY_PROFILES];
 
-/** Preserve existing attached/headless registrations when protocol is omitted. */
+/** The single hexrays protocol profile, selected by registration mode. */
 export const idaCompatibilityProfile = (
   config: IdaConfiguration,
-): IdaCompatibilityProfile =>
-  IDA_COMPATIBILITY_PROFILES[
-    config.protocol ?? (config.mode === "attached" ? "legacy" : "modern")
-  ];
+): IdaCompatibilityProfile => IDA_COMPATIBILITY_PROFILES[config.mode];
 
 /** Read one explicit registration without starting or installing a provider. */
 export const readIdaConfiguration = (
@@ -181,10 +163,10 @@ export const readIdaConfiguration = (
       );
       const input: unknown = JSON.parse(text);
       const envelope = z
-        .object({ mcpServers: z.object({ "ida-pro-mcp": z.unknown() }) })
+        .object({ mcpServers: z.object({ ida: z.unknown() }) })
         .safeParse(input);
       const registration = envelope.success
-        ? envelope.data.mcpServers["ida-pro-mcp"]
+        ? envelope.data.mcpServers.ida
         : input;
       const parsed = registrationSchema.safeParse(registration);
       if (parsed.success) return ok(parsed.data);

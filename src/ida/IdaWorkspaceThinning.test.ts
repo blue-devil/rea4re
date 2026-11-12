@@ -285,8 +285,8 @@ describe("IDA workspace admission identity", () => {
       producer,
     );
     expect((await client.execute("health", {})).ok).toBe(true);
-    const open = producer.calls.find(({ name }) => name === "idb_open");
-    expect(String(open?.args.input_path)).toContain("universal");
+    const open = producer.calls.find(({ name }) => name === "open_database");
+    expect(String(open?.args.path)).toContain("universal");
     expect((await client.close()).ok).toBe(true);
   });
 });

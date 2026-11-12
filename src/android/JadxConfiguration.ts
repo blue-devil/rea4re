@@ -50,8 +50,8 @@ import {
   JADX_WINDOWS_NATIVE_REMEDIATION,
 } from "./JadxRelease.js";
 
-// Bound ZIP metadata allocation during discovery. The audited 0.7.1 JAR's
-// central directory occupies 2,294,350 bytes; class bodies are not read here.
+// Bound ZIP metadata allocation during discovery. The audited 0.8.0 JAR's
+// central directory occupies 2,997,026 bytes; class bodies are not read here.
 const JAR_METADATA_READ_MAX_BYTES = 8 * 1024 * 1024;
 
 /** Caller-supplied tools, resolved only when an Android operation is selected. */
@@ -533,7 +533,7 @@ const requireSupportedHost = (): void => {
   }
   throw configurationFailure(
     "unsupported_host",
-    `Android JADX subprocess ownership is unsupported on ${process.platform}/${process.arch}; use Linux, macOS, or Windows x64 with its bundled native controls.`,
+    `Android JADX subprocess ownership is unsupported on ${process.platform}/${process.arch}; use Linux, macOS, or Windows x64 with its bundled native controls. Windows 11 ARM64 hosts run REA under an x64 Node.js process (x64 emulation).`,
     { platform: process.platform },
     "unsupported_host",
   );

@@ -55,7 +55,7 @@ const [
   { toolContract },
   { evidenceSchema },
   { functionDossierSchema },
-  { readIdaConfiguration, idaCompatibilityProfile },
+  { readIdaConfiguration },
   { createIdaMcpConnection },
   { idaAddressSchema },
 ] = await Promise.all([
@@ -74,14 +74,6 @@ const config = await withVerifierResourceOwner(async (resourceScope) => {
   if (!registration.ok) throw registration.error;
   return registration.value;
 });
-if (
-  config.protocol === "native" &&
-  (values["second-procedure"] === undefined ||
-    values["second-marker"] === undefined)
-)
-  throw new Error(
-    "Native IDA verification requires --second-procedure and --second-marker to verify distinct-function switching; see docs/providers/ida-provider.md.",
-  );
 const environment = Object.fromEntries(
   Object.entries({
     ...process.env,
@@ -92,7 +84,7 @@ const environment = Object.fromEntries(
 const report = {
   passed: false,
   mode: config.mode,
-  protocol: idaCompatibilityProfile(config).protocol,
+  protocol: "hexrays",
   checks: [],
   observations: [],
   unverified: [],
@@ -116,17 +108,15 @@ const observe = (input) => {
   assert.equal(evidence.analysis_profile.parameters.cache_policy, "live");
   assert.equal(evidence.analysis_profile.parameters.engine_version, null);
   assert.ok(evidence.limitations.length > 0);
-  if (config.protocol === "native" && evidence.operation === "analyze_function")
-    assert.equal(evidence.relationship_coverage?.status, "unknown");
   assert.ok(
     evidence.locations.some((location) => location.kind === "artifact-path"),
   );
   if (config.mode === "headless") {
-    assert.notEqual(evidence.raw_result.metadata_before.input_path, target);
-    workspaces.add(dirname(evidence.raw_result.metadata_before.input_path));
+    assert.notEqual(evidence.raw_result.metadata_before.path, target);
+    workspaces.add(dirname(evidence.raw_result.metadata_before.path));
     for (const observation of evidence.raw_result.observations) {
-      assert.equal(typeof observation.arguments.database, "string");
-      databases.add(observation.arguments.database);
+      assert.equal(typeof observation.arguments.instance_id, "string");
+      databases.add(observation.arguments.instance_id);
     }
   }
   report.observations.push(evidence);
@@ -210,9 +200,7 @@ const mcp = async (cliDossier) => {
       ["procedure_address", { procedure: dossier.procedure.name }],
       ["procedure_assembly", { procedure: dossier.procedure.address }],
       ["procedure_callees", { procedure: dossier.procedure.address }],
-      ...(config.mode === "attached" && config.protocol !== "native"
-        ? [["procedure_callers", { procedure: dossier.procedure.address }]]
-        : []),
+      ["procedure_callers", { procedure: dossier.procedure.address }],
       ["search_procedures", { pattern: dossier.procedure.name }],
       ["procedure_pseudo_code", { procedure: dossier.procedure.address }],
       ["read_function_instructions", { procedure: dossier.procedure.address }],
@@ -409,31 +397,43 @@ const mcp = async (cliDossier) => {
     () => transport.close(),
   ]);
 };
+const identityProbeCode =
+  '{"path": db.path, "sha256": db.sha256, "base": f"{db.base_address:x}" if db.base_address is not None else None}';
 const cleanup = async () => {
   phase = "upstream lifecycle verification";
   const upstream = createIdaMcpConnection(config, process.env);
   try {
     await upstream.connect();
     if (config.mode === "attached") {
-      const metadata =
-        config.protocol === "native"
-          ? await upstream.readResource("ida://idb/metadata")
-          : await upstream.call("get_metadata", {});
-      assert.equal(metadata.sha256.toLowerCase(), await digest());
+      const opened = await upstream.call("open_database", {
+        path: target,
+        set_current: true,
+      });
+      const instanceId = opened.instance_id;
+      try {
+        const probed = await upstream.call("execute_python", {
+          instance_id: instanceId,
+          code: identityProbeCode,
+          timeout: 60,
+        });
+        assert.equal(probed.result.sha256.toLowerCase(), await digest());
+      } finally {
+        await upstream.call("close_database", { instance_id: instanceId });
+      }
       report.checks.push(
         "existing GUI target remains open with the original input identity",
       );
     } else {
-      const inventory = await upstream.call("idb_list", {});
+      const inventory = await upstream.call("list_databases", {});
       assert.ok(
-        inventory.sessions.every(
-          (session) => !databases.has(session.session_id),
+        inventory.instances.every(
+          (instance) => !databases.has(instance.instance_id ?? ""),
         ),
       );
       for (const workspace of workspaces)
         await assert.rejects(access(workspace), { code: "ENOENT" });
       report.checks.push(
-        "owned database IDs absent from upstream discovery and private workspaces removed",
+        "owned instance ids absent from upstream discovery and private workspaces removed",
       );
     }
   } finally {

@@ -106,11 +106,12 @@ it.each(["failed", "cancelled"] as const)(
         targetKind: "executable",
         loaderArgs: [],
         bridgeScriptPath: join(directory, "bridge.py"),
-        launchMode: "native",
+        launchMode: "verified_linux_demo",
+        demoHelperPath: "/unused/helper.py",
       },
       {
-        platform: "darwin",
-        acquireTargetLease: async () => ({
+        platform: "linux",
+        acquireApplicationLease: async () => ({
           acquired: true,
           lease: {
             release: async () => {

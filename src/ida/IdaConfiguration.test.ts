@@ -31,7 +31,7 @@ describe("IDA registration and MCP result boundaries", () => {
       { command: "python", args: ["server.py"] },
       {
         mcpServers: {
-          "ida-pro-mcp": { command: "python", args: ["server.py"] },
+          ida: { command: "python", args: ["server.py"] },
           unrelated: { command: "untouched" },
         },
       },

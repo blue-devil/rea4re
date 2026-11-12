@@ -83,9 +83,8 @@ export const evidenceSchema = { parse: (value) => value };
 export const functionDossierSchema = { parse: (value) => value };
 export const readIdaConfiguration = async () => ({
   ok: true,
-  value: { mode: "attached", protocol: "native", timeoutMs: 100 },
+  value: { mode: "attached", timeoutMs: 100 },
 });
-export const idaCompatibilityProfile = () => ({ protocol: "native" });
 export function createIdaMcpConnection() {
   throw new Error("upstream never reached");
 }

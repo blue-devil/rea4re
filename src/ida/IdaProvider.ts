@@ -1,5 +1,4 @@
 import { bindArtifactFileCleanup } from "../artifacts/ArtifactFileOperation.js";
-import { launchRegexMatchingLimitation } from "../process/RegexMatcher.js";
 import { snapshotEnvironment } from "../process/snapshotEnvironment.js";
 import {
   createAnalysisProfile,
@@ -95,21 +94,8 @@ export class IdaProvider implements AnalysisProviderCandidate {
   }
   capabilities(): readonly CapabilityDescriptor[] {
     const profiles = [
-      ...idaCapabilities(
-        IDA_COMPATIBILITY_PROFILES.legacy,
-        false,
-        this.#regexLimitation(),
-      ),
-      ...idaCapabilities(
-        IDA_COMPATIBILITY_PROFILES.native,
-        true,
-        this.#regexLimitation(),
-      ),
-      ...idaCapabilities(
-        IDA_COMPATIBILITY_PROFILES.modern,
-        true,
-        this.#regexLimitation(),
-      ),
+      ...idaCapabilities(IDA_COMPATIBILITY_PROFILES.attached, false),
+      ...idaCapabilities(IDA_COMPATIBILITY_PROFILES.headless, true),
     ];
     const byOperation = new Map<string, (typeof profiles)[number][]>();
     for (const capability of profiles) {
@@ -193,7 +179,6 @@ export class IdaProvider implements AnalysisProviderCandidate {
       ? idaCapabilities(
           idaCompatibilityProfile(config.value),
           "command" in config.value,
-          this.#regexLimitation(),
         )
       : this.capabilities();
     const registrationDiagnostics = {
@@ -428,12 +413,6 @@ export class IdaProvider implements AnalysisProviderCandidate {
     if (scope?.active === true) this.#registrationByScope.set(scope, pending);
     const registration = await pending;
     return registration;
-  }
-  #regexLimitation(): string {
-    return launchRegexMatchingLimitation(
-      this.config.regexMatchingDeadline,
-      this.config.regexWorkerHeapRequest,
-    );
   }
   #createBoundClient(
     config: IdaConfiguration,

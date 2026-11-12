@@ -9,7 +9,6 @@ import { createDoctorHostFixture as host } from "./Doctor.fixture.js";
 import { runDoctor, systemDoctorHost, type DoctorHost } from "./Doctor.js";
 import { err } from "../domain/result.js";
 import { HopperReleaseError } from "./HopperReleaseFeed.js";
-import { MAC_HOPPER_SYSTEM_LAUNCHER } from "./MacHopperPaths.js";
 import { createTestTempDirectory } from "../../tests/fixtures/temporaryDirectory.js";
 
 const configurationHost = (
@@ -19,8 +18,17 @@ const configurationHost = (
   ...host({
     installationPaths: () => Promise.resolve([]),
     clientRegistrations: () => Promise.resolve([]),
+    platform: "linux",
+    linuxDistribution: () => Promise.resolve(supportedUbuntuDistribution),
   }),
 });
+
+const supportedUbuntuDistribution = {
+  id: "ubuntu",
+  versionId: "24.04",
+  packageFamily: "deb",
+  hopperSetupSupported: true,
+} as const;
 
 describe("doctor Hopper startup timeout", () => {
   const timeoutHost = (
@@ -34,6 +42,8 @@ describe("doctor Hopper startup timeout", () => {
     ...host({
       installationPaths: () => Promise.resolve([]),
       clientRegistrations: () => Promise.resolve([]),
+      platform: "linux",
+      linuxDistribution: () => Promise.resolve(supportedUbuntuDistribution),
       ...overrides,
     }),
   });
@@ -551,7 +561,7 @@ describe("doctor", () => {
       ),
     ).toEqual({
       node: `Install ${SUPPORTED_NODE_VERSION_PROSE}.`,
-      host: "REA supports macOS 12+, Linux distributions with a recognized apt, dnf, or pacman package family, and the experimental Windows x64 Ghidra P0 boundary; automated Hopper setup on Linux additionally requires an x86_64 host running Ubuntu 24.04+, Fedora 41+, Nobara 44+, Arch Linux, CachyOS, or Omarchy.",
+      host: "REA supports macOS 12+, Linux distributions with a recognized apt, dnf, or pacman package family, and the experimental Windows x64 Ghidra P0 boundary. Windows 11 ARM64 hosts run REA under an x64 Node.js process (x64 emulation); automated Hopper setup on Linux additionally requires an x86_64 host running Ubuntu 24.04+, Fedora 41+, Nobara 44+, Arch Linux, CachyOS, or Omarchy.",
       hopper: "Run rea setup to install Hopper, or set HOPPER_LAUNCHER_PATH.",
       target: "Supply a readable local app or program path.",
     });
@@ -571,7 +581,7 @@ describe("doctor", () => {
     );
   });
 
-  it("admits only the experimental Windows x64 host boundary", async () => {
+  it("admits the experimental Windows x64 and ARM64 host boundary", async () => {
     const windows = await runDoctor(
       undefined,
       host({
@@ -596,32 +606,28 @@ describe("doctor", () => {
       detail: "win32 x64",
     });
     expect(arm.checks.find(({ name }) => name === "host")).toMatchObject({
-      ok: false,
+      ok: true,
       detail: "win32 arm64",
     });
   });
-  it("detects a manual configured Hopper before Homebrew", async () => {
-    let brewProbes = 0;
+  it("detects a manual configured Hopper", async () => {
     const result = await runDoctor(
       undefined,
       host({
         configuredHopperPath: "/manual/Hopper",
         executable: (path) => Promise.resolve(path === "/manual/Hopper"),
-        brewHopperPath: () => {
-          brewProbes += 1;
-          return Promise.resolve(undefined);
-        },
       }),
     );
     expect(result.hopperPath).toBe("/manual/Hopper");
     expect(result.healthy).toBe(true);
-    expect(brewProbes).toBe(0);
   });
 
   it("reports optional BYO ilspycmd diagnostics only when configured", async () => {
     const result = await runDoctor(
       undefined,
       host({
+        platform: "linux",
+        linuxDistribution: () => Promise.resolve(supportedUbuntuDistribution),
         configuredIlspyCmdPath: "/tools/ilspycmd",
         ilspyCmdVersion: (path) =>
           Promise.resolve(
@@ -1188,13 +1194,13 @@ describe("doctor Linux and Hopper discovery", () => {
 });
 
 describe("doctor installed Hopper discovery", () => {
-  it("checks the canonical user install after the system launcher", async () => {
-    const userPath =
-      "/fixture/home/Applications/Hopper Disassembler.app/Contents/MacOS/hopper";
+  it("checks the REA-managed launcher before the user-local install", async () => {
+    const userPath = "/fixture/home/.local/share/rea/hopper/bin/Hopper";
     const checked: string[] = [];
     const result = await runDoctor(
       undefined,
       host({
+        platform: "linux",
         homeDirectory: "/fixture/home",
         executable: (candidate) => {
           checked.push(candidate);
@@ -1204,57 +1210,31 @@ describe("doctor installed Hopper discovery", () => {
     );
 
     expect(result.hopperPath).toBe(userPath);
-    expect(checked.slice(0, 2)).toEqual([
-      "/Applications/Hopper Disassembler.app/Contents/MacOS/hopper",
-      userPath,
-    ]);
-  });
-
-  it("detects a Homebrew cask installed outside /Applications", async () => {
-    const path =
-      "/opt/homebrew/Caskroom/hopper/Hopper Disassembler.app/Contents/MacOS/hopper";
-    const result = await runDoctor(
-      undefined,
-      host({
-        executable: (candidate) => Promise.resolve(candidate === path),
-        brewHopperPath: () => Promise.resolve(path),
-      }),
-    );
-    expect(result.hopperPath).toBe(path);
+    expect(checked.slice(0, 2)).toEqual(["/opt/hopper/bin/Hopper", userPath]);
   });
 });
 
 describe("doctor Hopper discovery matches runtime selection", () => {
   // Model launchers with runtime's POSIX joins; filesystem work stays native.
   const launchers = (home: string) => ({
-    macSystem: MAC_HOPPER_SYSTEM_LAUNCHER,
-    renamed: posix.join(
-      home,
-      "Applications/Hopper 5.app/Contents/MacOS/hopper",
-    ),
+    linuxManaged: "/opt/hopper/bin/Hopper",
+    linuxUser: posix.join(home, ".local/share/rea/hopper/bin/Hopper"),
     linuxSystem: "/opt/hopper-v4/bin/hopper",
   });
   type Launcher = keyof ReturnType<typeof launchers>;
 
   it.each<[NodeJS.Platform, readonly Launcher[], Launcher | undefined]>([
-    ["darwin", ["linuxSystem"], undefined],
-    ["darwin", ["linuxSystem", "renamed"], "renamed"],
-    ["darwin", ["linuxSystem", "macSystem"], "macSystem"],
-    ["darwin", ["renamed", "macSystem"], "macSystem"],
-    ["linux", ["macSystem", "renamed"], undefined],
-    ["linux", ["macSystem", "linuxSystem"], "linuxSystem"],
-    ["win32", ["macSystem", "linuxSystem", "renamed"], undefined],
+    ["linux", ["linuxSystem"], "linuxSystem"],
+    ["linux", ["linuxSystem", "linuxUser"], "linuxUser"],
+    ["linux", ["linuxSystem", "linuxManaged"], "linuxManaged"],
+    ["win32", ["linuxManaged", "linuxSystem", "linuxUser"], undefined],
   ])(
     "on %s with %j executable, selects %s",
     async (platform, executable, expected) => {
-      // Runtime enumerates renamed bundles from disk; doctor reads its host scan.
       const home = await createTestTempDirectory("rea-doctor-hopper-");
-      await mkdir(join(home, "Applications/Hopper 5.app"), { recursive: true });
       const paths = launchers(home);
       const executables = new Set(executable.map((name) => paths[name]));
       const probed: string[] = [];
-      let renamedScans = 0;
-      let brewProbes = 0;
       const result = await runDoctor(
         undefined,
         host({
@@ -1263,14 +1243,6 @@ describe("doctor Hopper discovery matches runtime selection", () => {
           executable: (path) => {
             probed.push(path);
             return Promise.resolve(executables.has(path));
-          },
-          manualHopperPaths: () => {
-            renamedScans += 1;
-            return Promise.resolve([paths.renamed]);
-          },
-          brewHopperPath: () => {
-            brewProbes += 1;
-            return Promise.resolve(undefined);
           },
         }),
       );
@@ -1288,12 +1260,6 @@ describe("doctor Hopper discovery matches runtime selection", () => {
         expect(result.hopperPath).toBe(
           executables.has(runtime) ? runtime : undefined,
         );
-      expect(renamedScans).toBe(
-        platform === "darwin" && expected !== "macSystem" ? 1 : 0,
-      );
-      expect(brewProbes).toBe(
-        platform === "darwin" && expected === undefined ? 1 : 0,
-      );
       if (expected === undefined)
         expect(
           result.checks.find(({ name }) => name === "hopper"),

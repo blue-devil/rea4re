@@ -21,16 +21,18 @@ describe("host platform is injected, not read from the ambient process", () => {
     expect(JSON.stringify(availability)).toContain("win32");
   });
 
-  it.each(["darwin", "linux"] as const)(
-    "does not gate Hopper as unsupported on %s",
-    (platform) => {
-      const provider = new HopperProvider(
-        config({ hopper_launcher_path: "/nonexistent/hopper-launcher" }),
-        silentLogger,
-        {},
-        platform,
-      );
-      expect(provider.inspectAvailability().code).not.toBe("unsupported_host");
-    },
-  );
+  it("does not gate Hopper as unsupported on linux", () => {
+    const provider = new HopperProvider(
+      config({ hopper_launcher_path: "/nonexistent/hopper-launcher" }),
+      silentLogger,
+      {},
+      "linux",
+    );
+    expect(provider.inspectAvailability().code).not.toBe("unsupported_host");
+  });
+
+  it("reports Hopper as unsupported on macOS", () => {
+    const provider = new HopperProvider(config(), silentLogger, {}, "darwin");
+    expect(provider.inspectAvailability().code).toBe("unsupported_host");
+  });
 });

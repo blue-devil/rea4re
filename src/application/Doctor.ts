@@ -17,7 +17,6 @@ import {
 } from "../config/parseConfig.js";
 import { homeDirectoryFromEnvironment } from "../config/homeDirectory.js";
 import { snapshotEnvironment } from "../process/snapshotEnvironment.js";
-import { appendCallerPath } from "../filesystem/callerPath.js";
 
 import { analysisErrorRemediationAction } from "../domain/analysisErrorPresentation.js";
 import { BinaryTargetError } from "../domain/configurationErrors.js";
@@ -33,8 +32,6 @@ import {
   javaScriptRuntime,
   type JavaScriptRuntime,
 } from "../domain/runtimeVersion.js";
-import { installedCaskAppdir, probeHomebrew } from "./homebrew.js";
-import { readMacHopperRenamedLauncherCandidates } from "./MacHopperPaths.js";
 import {
   inspectLinuxHopperLauncher,
   linuxSharedLibrariesAvailable,
@@ -142,10 +139,6 @@ export interface DoctorHost {
     path: string,
   ): Promise<Result<VerifiedLinuxHopperLauncher, HopperReleaseError>>;
   linuxDemoRuntimeCheck(): Promise<DoctorCheck>;
-  /** Homebrew cask launcher; consulted only where macOS bundles are probed. */
-  brewHopperPath(): Promise<string | undefined>;
-  /** Renamed `Hopper*.app` launchers; consulted only where macOS bundles are probed. */
-  manualHopperPaths(): Promise<readonly string[]>;
   providerInspections?(
     clients: readonly string[],
   ): Promise<readonly DoctorProviderInspection[]>;
@@ -807,40 +800,6 @@ export const systemDoctorHost = (
         ? uncomposedLinuxDemoRuntimeCheck()
         : options.linuxDemoRuntimeCheck(resourceScope, inspectionSignal),
     inspectLinuxHopper: (path) => inspectLinuxHopperLauncher(path, environment),
-    async brewHopperPath() {
-      return probeHomebrew(async (command) => {
-        let caskroom: string;
-        try {
-          // Without a cask argument, `--caskroom` does not load Homebrew's
-          // cask API, so doctor writes no Homebrew cache files.
-          caskroom = (
-            await hostExecFileOutput(
-              command,
-              ["--caskroom"],
-              commandEnvironment,
-            )
-          ).stdout.trim();
-        } catch (cause: unknown) {
-          if (cause instanceof AnalysisCancelledError) throw cause;
-          // best-effort cleanup: optional Homebrew probing; absence means uninstalled.
-          void cause;
-          return undefined;
-        }
-        const appdir = await installedCaskAppdir(
-          caskroom,
-          "hopper-disassembler",
-          homeDirectory,
-        );
-        return appdir === undefined
-          ? undefined
-          : appendCallerPath(
-              appdir,
-              "Hopper Disassembler.app/Contents/MacOS/hopper",
-            );
-      });
-    },
-    manualHopperPaths: () =>
-      readMacHopperRenamedLauncherCandidates(homeDirectory),
     ...(options.providerInspections === undefined
       ? {}
       : {

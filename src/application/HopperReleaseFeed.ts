@@ -46,8 +46,6 @@ const archiveReleaseSchema = z.object({
   file_length: z.string().regex(/^\d+$/u),
   file_hash: z.string().regex(/^[a-f0-9]{40}$/u),
 });
-export type MacHopperRelease = z.infer<typeof archiveReleaseSchema> &
-  Record<string, JsonValue>;
 
 const selectedPlatformsSchema = z.object({
   "OS X": z.unknown().optional(),
@@ -63,44 +61,6 @@ const isPublicHopperDownload = (url: URL): boolean =>
   url.password === "" &&
   !urlDeclaresQueryOrFragment(url) &&
   url.pathname.startsWith("/downloader/public/");
-
-/** Admit the selected macOS row without projecting away vendor release metadata. */
-export const parseMacHopperReleases = (
-  raw: unknown,
-): Result<MacHopperRelease, HopperReleaseError> => {
-  const root = selectedPlatformsSchema.safeParse(raw);
-  const release = jsonObjectSchema.safeParse(
-    root.success ? root.data["OS X"] : undefined,
-  );
-  if (!release.success || !archiveReleaseSchema.safeParse(release.data).success)
-    return err(
-      new HopperReleaseError(
-        "release_metadata",
-        "The Hopper macOS release metadata is malformed.",
-      ),
-    );
-  const retained = release.data as MacHopperRelease;
-  if (!isPublicHopperDownload(new URL(retained.filename)))
-    return err(
-      new HopperReleaseError(
-        "release_metadata",
-        "The Hopper macOS release is outside the official download channel.",
-      ),
-    );
-  return ok(retained);
-};
-
-/**
- * The minimum macOS version the selected release declares (`deployment_target`).
- * Undefined when the row declares none as text; the signed application's own
- * requirement is still checked before it is copied.
- */
-export const macHopperReleaseMinimumSystemVersion = (
-  release: MacHopperRelease,
-): string | undefined =>
-  typeof release.deployment_target === "string"
-    ? release.deployment_target
-    : undefined;
 
 /** Stable publisher identity; signing subkeys are admitted through this primary. */
 export const HOPPER_LINUX_PRIMARY_FINGERPRINT =

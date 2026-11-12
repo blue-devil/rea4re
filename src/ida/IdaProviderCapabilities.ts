@@ -4,35 +4,8 @@ import {
 } from "./IdaProviderMetadata.js";
 import type { IdaCompatibilityProfile } from "./IdaConfiguration.js";
 import type { CapabilityDescriptor } from "../application/AnalysisProvider.js";
-import { REGEX_MATCHING_LIMITATION } from "../process/RegexMatcher.js";
 
 export type IdaOperation = (typeof IDA_OPERATIONS)[number];
-
-/** Operations only the modern headless profile implements. */
-const HEADLESS_ONLY_OPERATIONS: ReadonlySet<IdaOperation> = new Set([
-  "resolve_containing_procedure",
-]);
-
-/** Whether the configured profile admits an operation. */
-const idaProfileAdmits = (
-  operation: IdaOperation,
-  profile: IdaCompatibilityProfile,
-): boolean =>
-  profile.mode === "headless" || !HEADLESS_ONLY_OPERATIONS.has(operation);
-
-/** One admission policy shared by catalog projection and live execution. */
-export const idaOperationUnavailableReason = (
-  operation: IdaOperation,
-  profile: IdaCompatibilityProfile,
-): string | undefined => {
-  if (!idaProfileAdmits(operation, profile))
-    return "This operation is available for the modern headless profile only.";
-  if (operation === "procedure_callers" && profile.protocol !== "legacy")
-    return profile.protocol === "native"
-      ? "The native upstream profile reports code references without proving direct call edges."
-      : "The modern upstream profile reports code references without proving direct call edges.";
-  return undefined;
-};
 
 /** Shared limitations of observations from an externally mutable analysis database. */
 export const IDA_LIMITATIONS = Object.freeze([
@@ -44,61 +17,30 @@ export const IDA_LIMITATIONS = Object.freeze([
   "Complete function body ranges, typed references, unresolved indirect calls, referenced data, and basic blocks are unavailable in this adapter. Empty unsupported dossier facets are unknown, not observed absence.",
 ]);
 
-export const IDA_NATIVE_STRING_LIMITATION =
-  "Native string observations use upstream C-string rendering; other string representations remain unknown.";
-
 /**
- * The legacy attached profile uses `disassemble_function`, which
- * jumps to the function and whose `decompile_function` opens or reuses a
- * pseudocode view whenever an IDA window is active.
+ * Advertise live observations truthfully. `execute_python` reads the attached
+ * database and never navigates the IDA GUI, so no operation may show UI.
  */
-const ATTACHED_GUI_NAVIGATION_OPERATIONS: ReadonlySet<IdaOperation> = new Set([
-  "procedure_pseudo_code",
-  "procedure_assembly",
-  "read_function_instructions",
-  "analyze_function",
-]);
-
-/** Advertise live observations and configured lifecycle effects truthfully. */
 export const idaCapabilities = (
   profile: IdaCompatibilityProfile,
   stdio: boolean,
-  regexLimitation = REGEX_MATCHING_LIMITATION,
-): readonly CapabilityDescriptor[] =>
-  IDA_OPERATIONS.filter((operation) =>
-    idaProfileAdmits(operation, profile),
-  ).map((operation) => {
-    const reason = idaOperationUnavailableReason(operation, profile);
-    return {
-      provider: IDA_PROVIDER_IDENTITY,
-      operation,
-      ...(reason === undefined
-        ? ({ available: true, reason: null } as const)
-        : ({ available: false, reason } as const)),
-      cachePolicy: "live",
-      effects: {
-        mutatesArtifact: false,
-        launchesProcess: stdio || profile.mode === "headless",
-        mayShowUi:
-          profile.mode === "attached" &&
-          (profile.protocol === "native"
-            ? operation === "procedure_pseudo_code" ||
-              operation === "analyze_function"
-            : ATTACHED_GUI_NAVIGATION_OPERATIONS.has(operation)),
-        mayAccessNetwork: true,
-        mayWriteFilesystem: stdio || profile.mode === "headless",
-        changesPermissions: false,
-        requiresRoot: false,
-      },
-      limitations: [
-        ...IDA_LIMITATIONS,
-        ...(profile.protocol === "native" &&
-        (operation === "list_strings" || operation === "search_strings")
-          ? [IDA_NATIVE_STRING_LIMITATION]
-          : []),
-        ...(operation === "search_procedures" || operation === "search_strings"
-          ? [regexLimitation]
-          : []),
-      ],
-    };
-  });
+): readonly CapabilityDescriptor[] => {
+  const headless = profile.mode === "headless";
+  return IDA_OPERATIONS.map((operation) => ({
+    provider: IDA_PROVIDER_IDENTITY,
+    operation,
+    available: true as const,
+    reason: null,
+    cachePolicy: "live" as const,
+    effects: {
+      mutatesArtifact: false,
+      launchesProcess: stdio || headless,
+      mayShowUi: false,
+      mayAccessNetwork: true,
+      mayWriteFilesystem: stdio || headless,
+      changesPermissions: false,
+      requiresRoot: false,
+    },
+    limitations: [...IDA_LIMITATIONS],
+  }));
+};

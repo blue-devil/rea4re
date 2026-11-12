@@ -5,13 +5,12 @@ import { workspaceCliTest } from "../../support/cli/workspaceCliFixture.js";
 import { elf } from "../../../src/domain/binaryTarget.fixture.js";
 
 /**
- * A headless IDA supervisor that completes the MCP handshake and then leaves
- * every tool call unanswered, as an `idb_open` still running auto-analysis
- * would. It exits when REA closes its input.
+ * An official ida-mcp server that completes the MCP handshake and then leaves
+ * every tool call unanswered, as an `open_database` still running
+ * auto-analysis would. It exits when REA closes its input.
  */
-const UNRESPONSIVE_SUPERVISOR = `import { createInterface } from "node:readline";
-const tools = ["idb_open", "idb_list", "idb_close", "server_health", "list_funcs",
-  "lookup_funcs", "find_regex", "decompile", "disasm", "callees", "xrefs_to"];
+const UNRESPONSIVE_SERVER = `import { createInterface } from "node:readline";
+const tools = ["open_database", "execute_python", "list_databases", "close_database"];
 const send = (message) =>
   process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...message }) + "\\n");
 for await (const line of createInterface({ input: process.stdin })) {
@@ -33,16 +32,13 @@ describe("headless IDA timeout through the one-shot CLI", () => {
   workspaceCliTest(
     "exits after a retained-cleanup failure instead of waiting on the supervisor",
     async ({ cli, workspace }) => {
-      const supervisor = await workspace.write(
-        "supervisor.mjs",
-        UNRESPONSIVE_SUPERVISOR,
-      );
+      const server = await workspace.write("server.mjs", UNRESPONSIVE_SERVER);
       const workspaceRoot = await workspace.mkdir("ida-workspaces");
       const registration = await workspace.write(
         "ida-mcp.json",
         JSON.stringify({
           command: process.execPath,
-          args: [supervisor],
+          args: [server],
           mode: "headless",
           timeoutMs: 500,
           workspaceRoot,
@@ -69,7 +65,7 @@ describe("headless IDA timeout through the one-shot CLI", () => {
           execution_failure: "provider_timeout",
           operation: "procedure_pseudo_code",
           diagnostics: {
-            startup_operation: "idb_open",
+            startup_operation: "open_database",
           },
           timeout_ms: 500,
           resources: [expect.stringContaining(workspaceRoot)],
@@ -79,15 +75,15 @@ describe("headless IDA timeout through the one-shot CLI", () => {
               provider_id: "ida",
               operation: "close",
               diagnostics: {
-                upstream_sessions: {
+                upstream_instances: {
                   state: "unverified",
-                  sessions: [
+                  instances: [
                     {
-                      session_id: expect.stringMatching(/^rea-/),
-                      backend: "worker",
-                      owned: null,
-                      input_path: null,
-                      is_active: null,
+                      instance_id: null,
+                      backend: "idalib",
+                      status: "attached",
+                      path: expect.stringContaining(workspaceRoot),
+                      error: null,
                     },
                   ],
                 },

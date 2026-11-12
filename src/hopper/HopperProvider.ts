@@ -101,13 +101,13 @@ export class HopperProvider implements AnalysisProviderCandidate {
       launcher_path: this.config.hopperLauncherPath,
       platform: this.platform,
     };
-    if (this.platform !== "darwin" && this.platform !== "linux")
+    if (this.platform !== "linux")
       return {
         status: "unavailable",
         code: "unsupported_host",
         reason: `Hopper integration is not supported on ${this.platform}.`,
         remediation:
-          "Run Hopper analysis on macOS or Linux, or select another analysis provider with REA_ANALYSIS_PROVIDER.",
+          "Run Hopper analysis on a supported x86_64 Linux distribution, or select another analysis provider with REA_ANALYSIS_PROVIDER.",
         diagnostics,
       };
     try {
@@ -146,14 +146,6 @@ export class HopperProvider implements AnalysisProviderCandidate {
         status: "unsupported",
         code: "target_kind_unsupported",
         reason: `Hopper cannot directly analyze ${target.kind} targets.`,
-        diagnostics,
-      };
-    if (target.kind === "database" && this.platform === "darwin")
-      return {
-        status: "unsupported",
-        code: "target_kind_unsupported",
-        reason:
-          "This Hopper macOS launcher cannot start REA's analysis bridge when opening a saved Hopper database. Open an executable target instead; saved-database analysis is unavailable until Hopper exposes a database launch route that runs the bridge script.",
         diagnostics,
       };
     if (target.kind === "database")
@@ -316,14 +308,10 @@ export class HopperProvider implements AnalysisProviderCandidate {
           new URL("../../bridge/hopper_bridge.py", import.meta.url),
         ),
         bridgeMaxRequestBytes: this.config.bridgeMaxRequestBytes,
-        ...(this.platform === "linux"
-          ? {
-              launchMode: "verified_linux_demo" as const,
-              demoHelperPath: fileURLToPath(
-                new URL("../../scripts/hopper-demo-x11.py", import.meta.url),
-              ),
-            }
-          : { launchMode: "native" as const }),
+        launchMode: "verified_linux_demo" as const,
+        demoHelperPath: fileURLToPath(
+          new URL("../../scripts/hopper-demo-x11.py", import.meta.url),
+        ),
       }),
       ...(context === undefined ? {} : { runId: context.runId }),
       readStartupTimeoutMs: () => this.config.hopperStartupTimeoutMs,

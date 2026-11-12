@@ -12,14 +12,16 @@ import { createIdaMcpConnection } from "../../../../src/ida/IdaMcpConnection.js"
 import { IdaSessionClient } from "../../../../src/ida/IdaSessionClient.js";
 
 /**
- * A headless IDA supervisor over real stdio that answers the session
+ * An official ida-mcp server over real stdio that answers the session
  * lifecycle, but rejects the first inventory after a close so cleanup fails
  * once and must be retried through the retained connection.
  */
-const FLAKY_INVENTORY_SUPERVISOR = `import { createInterface } from "node:readline";
-const tools = ["idb_open", "idb_list", "idb_close", "server_health", "list_funcs",
-  "lookup_funcs", "find_regex", "decompile", "disasm", "callees", "xrefs_to"];
-let session;
+const flakyInventoryServer = (
+  sha256: string,
+) => `import { createInterface } from "node:readline";
+const tools = ["open_database", "execute_python", "list_databases", "close_database"];
+const opMarker = /^# rea-op:(\\w+)\\n# rea-args:(\\{.*\\})\\n([\\s\\S]*)$/u;
+let instanceId;
 let inputPath;
 let closed = false;
 let inventoryFailed = false;
@@ -30,25 +32,30 @@ const result = (value) => ({
   structuredContent: value,
 });
 const call = ({ name, arguments: args }) => {
-  if (name === "idb_open") {
-    session = args.preferred_session_id;
-    inputPath = args.input_path;
-    return result({ success: true, session: { session_id: session, input_path: inputPath } });
+  if (name === "open_database") {
+    inputPath = args.path;
+    instanceId = "flaky-instance-1";
+    return result({ instance_id: instanceId, backend: "idalib", status: "attached",
+      recovery: "none", log_path: inputPath + ".log", mcp_id: null, hint: null });
   }
-  if (name === "server_health")
-    return result({ status: "ok", input_path: inputPath, idb_path: inputPath + ".i64",
-      module: "target.elf", imagebase: "0x1000", auto_analysis_ready: true });
-  if (name === "idb_close") {
+  if (name === "execute_python") {
+    const op = opMarker.exec(String(args.code))?.[1];
+    if (op !== "identity")
+      return { isError: true, content: [{ type: "text", text: "unsupported op " + op }] };
+    return result({ result: { path: inputPath, sha256: "${sha256}", base: "0x1000",
+      architecture: "metapc", bitness: 64 }, stdout: "", stderr: "" });
+  }
+  if (name === "close_database") {
     closed = true;
-    return result({ success: true, session_id: session, saved: null, owned: true, backend: "worker" });
+    return result({ closed: true, final_lease: true, idb_path: inputPath + ".i64" });
   }
-  if (name === "idb_list") {
+  if (name === "list_databases") {
     if (closed && !inventoryFailed) {
       inventoryFailed = true;
       return { isError: true, content: [{ type: "text", text: "inventory unavailable" }] };
     }
-    return result({ sessions: closed ? [] : [{ session_id: session, input_path: inputPath,
-      owned: true, backend: "worker", is_active: true }] });
+    return result({ instances: closed ? [] : [{ path: inputPath, backend: "idalib",
+      status: "attached", instance_id: instanceId, error: null }] });
   }
   return { isError: true, content: [{ type: "text", text: "unsupported " + name }] };
 };
@@ -72,8 +79,7 @@ for await (const line of createInterface({ input: process.stdin })) {
 describe("retained headless IDA connection in a long-lived host", () => {
   it("retries cleanup through the detached stdio connection", async () => {
     const root = await createTestTempDirectory("rea-ida-retry-");
-    const supervisor = join(root, "supervisor.mjs");
-    await writeFile(supervisor, FLAKY_INVENTORY_SUPERVISOR);
+    const server = join(root, "server.mjs");
     const workspaceRoot = join(root, "workspaces");
     await mkdir(workspaceRoot);
     const bytes = elf(2, 1, 62);
@@ -87,16 +93,17 @@ describe("retained headless IDA connection in a long-lived host", () => {
       architecture: "x86_64",
       availableArchitectures: ["x86_64"],
     };
+    await writeFile(server, flakyInventoryServer(target.sha256));
     const config = {
       command: process.execPath,
-      args: [supervisor],
+      args: [server],
       env: {},
       mode: "headless" as const,
       timeoutMs: 5000,
       workspaceRoot,
     };
     const connection = createIdaMcpConnection(config, process.env);
-    // Close the supervisor even when an assertion fails before cleanup does.
+    // Close the server even when an assertion fails before cleanup does.
     onTestFinished(() => connection.close().catch(() => undefined));
     const client = new IdaSessionClient(config, target, connection);
 

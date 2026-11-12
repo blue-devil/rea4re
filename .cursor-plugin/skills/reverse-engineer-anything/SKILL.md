@@ -408,20 +408,18 @@ explicit path or endpoint and do not need it.
 
 For an existing IDA MCP configuration, use `open_binary` with the original
 input binary and `provider_id: "ida"`; do not pass an `.idb` or `.i64` database.
-The legacy attached profile binds the already-open GUI input by SHA-256 and
-leaves its database open. The modern headless profile creates and closes an
-owned private database without saving. Installation and registration reuse
-[mrexodia/ida-pro-mcp](https://github.com/mrexodia/ida-pro-mcp); see the
+The attached profile binds the already-open GUI input by SHA-256 and leaves
+its database open and unsaved; the headless profile opens and closes an owned
+private worker database without saving. Installation and registration reuse
+the official [HexRaysSA/ida-mcp](https://github.com/HexRaysSA/ida-mcp) server;
+see the
 [IDA provider guide](https://github.com/morluto/rea/blob/main/docs/providers/ida-provider.md).
-For migration to the separate native IDA MCP plugin, follow the guide's
-[legacy attached migration](https://github.com/morluto/rea/blob/main/docs/providers/ida-provider.md#migrate-a-legacy-attached-registration).
-Replace the upstream registration explicitly; modern mrexodia tools are not the
-native profile. Native attachment preserves the database but does not provide
-direct callers; check session availability and the guide's verification limits.
-Proceed directly to `analyze_function`, pseudocode, or function/string searches
-after opening; IDA does not supply `binary_overview`. Consult session availability
-when composing broader workflows. Modern direct callers and unsupported dossier
-facets remain unknown; live IDA results are not replayed from snapshots.
+Direct callers, callees, and containing-procedure resolution are available in
+both modes. Proceed directly to `analyze_function`, pseudocode, or
+function/string searches after opening; IDA does not supply `binary_overview`.
+Consult session availability when composing broader workflows. Unsupported
+dossier facets remain unknown; live IDA results are not replayed from
+snapshots.
 
 With `REA_KUNA_COMMAND` configured, `provider_id: "kuna"` answers procedure
 lists, lookups, pseudocode, assembly and `analyze_function` from Kuna's cached

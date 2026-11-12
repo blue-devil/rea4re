@@ -7,7 +7,7 @@ import { androidResultSchemas } from "../../../src/domain/android/androidAnalysi
 
 const engine = {
   name: "jadx",
-  version: "0.7.1",
+  version: "0.8.0",
   artifact_sha256: "a".repeat(64),
   source_revision: null,
   worker_count: 1,

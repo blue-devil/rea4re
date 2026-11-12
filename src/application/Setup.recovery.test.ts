@@ -7,8 +7,6 @@ import { ConfigurationError } from "../domain/configurationErrors.js";
 import { SUPPORTED_NODE_VERSION_PROSE } from "../domain/runtimeVersion.js";
 import { FakeSetupHost, options } from "./Setup.fixture.js";
 import { runSetup } from "./Setup.js";
-import { discoverSetupState } from "./SetupPlan.js";
-import { macHopperInstallDisclosure } from "./MacHopper.js";
 import {
   parseLinuxDistribution,
   type LinuxDistribution,
@@ -495,7 +493,7 @@ describe("setup scoped readiness", () => {
     macHost.version = "11.7";
     expect((await runSetup(options(true), macHost)).status).toBe("ready");
     expect((await runSetup(options(true, true), macHost)).remediation).toBe(
-      "Upgrade to macOS 12 or newer.",
+      unsupportedLinux,
     );
   });
 
@@ -671,20 +669,12 @@ describe("setup Hopper install eligibility", () => {
     {
       label: "Windows",
       platform: "win32",
-      refusal:
-        "REA supports Hopper on macOS and selected x86_64 Linux distributions.",
+      refusal: unsupportedLinux,
     },
     {
-      label: "macOS 11",
+      label: "macOS",
       platform: "darwin",
-      version: "11.7",
-      refusal: "Upgrade to macOS 12 or newer.",
-    },
-    {
-      label: "macOS with an unknown version",
-      platform: "darwin",
-      version: undefined,
-      refusal: "Upgrade to macOS 12 or newer.",
+      refusal: unsupportedLinux,
     },
     {
       label: "an unsupported Linux distribution",
@@ -734,7 +724,6 @@ describe("setup Hopper install eligibility", () => {
   );
 
   it.each([
-    { label: "macOS 14", platform: "darwin", version: "14.5" },
     {
       label: "a supported Linux distribution",
       platform: "linux",
@@ -759,64 +748,6 @@ describe("setup Hopper install eligibility", () => {
       );
       expect(followed.appliedActions).toContain("installed_hopper");
       expect(host.hopperInstalls).toBe(1);
-    },
-  );
-
-  it.each([
-    { version: "", installs: false },
-    { version: "14beta", installs: false },
-    { version: "14.garbage", installs: false },
-    { version: "14.", installs: false },
-    { version: "14.0\n", installs: false },
-    { version: "99999999999999999", installs: false },
-    // REA's own floor admits these; the selected release's minimum is
-    // compared by the installer, which this recording host replaces.
-    { version: "12", installs: true },
-    { version: "12.0", installs: true },
-  ])(
-    "decides an explicit Hopper installation for macOS %j",
-    async ({ version, installs }) => {
-      const host = new FakeSetupHost("darwin");
-      host.version = version;
-
-      const result = await runSetup(options(true, true), host);
-
-      expect(result.appliedActions.includes("installed_hopper")).toBe(installs);
-      expect(host.hopperInstalls).toBe(installs ? 1 : 0);
-      if (!installs)
-        expect(result).toMatchObject({
-          status: "needs_human",
-          remediation: "Upgrade to macOS 12 or newer.",
-        });
-    },
-  );
-
-  it.each(["12.0", "12.3", "12.4", "14.5"])(
-    "leaves Hopper support on macOS %s unknown until the release minimum is read",
-    async (version) => {
-      const host = new FakeSetupHost("darwin");
-      host.version = version;
-
-      const discovery = await discoverSetupState({
-        host,
-        providerConfigured: false,
-        forceHopperInstall: false,
-        proposeHopper: true,
-        initialDoctor: await host.doctor(),
-      });
-      expect(discovery).toMatchObject({
-        hopperInstall: { supported: "unknown" },
-        installHopper: true,
-      });
-      const plan = await runSetup(
-        { ...options(false, true), dryRun: true },
-        host,
-      );
-      // The installer owns the disclosed check; its refusal is tested there.
-      expect(
-        plan.plannedActions.find(({ kind }) => kind === "install_hopper")
-          ?.detail,
-      ).toBe(macHopperInstallDisclosure.detail);
     },
   );
 });
@@ -1001,7 +932,8 @@ describe("setup cancellation", () => {
 
 describe("setup cancellation during installation and cleanup", () => {
   it("carries the caller's cancellation into the Hopper install", async () => {
-    const host = new FakeSetupHost("darwin");
+    const host = new FakeSetupHost("linux");
+    host.distribution = supportedUbuntu;
     host.clients = [
       {
         name: "codex",

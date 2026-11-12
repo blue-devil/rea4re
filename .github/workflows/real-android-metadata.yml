@@ -40,7 +40,7 @@ jobs:
           export JAVA_HOME="$JAVA_HOME_21_X64"
           android_root="$RUNNER_TEMP/rea-android"
           classes="$android_root/classes"
-          jar="$android_root/jadx-headless-mcp-0.7.1-all.jar"
+          jar="$android_root/jadx-headless-mcp-0.8.0-all.jar"
           mkdir -p "$classes"
           "$JAVA_HOME/bin/javac" -J-Xmx512m -J-XX:ActiveProcessorCount=2 \
             -classpath "$jar" -d "$classes" \

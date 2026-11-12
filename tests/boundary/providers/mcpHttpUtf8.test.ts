@@ -139,7 +139,6 @@ const createConnection = (provider: "ida" | "jeb", endpoint: string) => {
         url: endpoint,
         headers: {},
         mode: "attached",
-        protocol: "native",
         timeoutMs: 1_000,
       },
       {},

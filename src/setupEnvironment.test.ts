@@ -11,7 +11,6 @@ import { join } from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import { createDoctorHostFixture } from "./application/Doctor.fixture.js";
-import * as macHopperInstaller from "./application/MacHopper.js";
 import { runSetup } from "./application/Setup.js";
 import { discoverSetupState } from "./application/SetupPlan.js";
 import { options } from "./application/Setup.fixture.js";
@@ -117,35 +116,6 @@ it("composes provider diagnostics from selected configuration rather than ambien
   expect(JSON.stringify(inspections)).not.toContain("/ambient/");
 });
 
-it("includes the macOS Hopper installer diagnostic in setup remediation", async () => {
-  const install = vi
-    .spyOn(macHopperInstaller, "installMacHopper")
-    .mockResolvedValue({
-      status: "failed",
-      reason: "mount",
-      diagnostic: "hdiutil attach exited 1:\n\u001b[31mresource busy\u001b[0m",
-    });
-  const host = systemSetupHost(
-    createDoctorHostFixture({ platform: "darwin" }),
-    { HOME: "/fixture/home", USERPROFILE: "/fixture/home" },
-  );
-  try {
-    const result = await host.installHopper(false);
-    expect(result).toMatchObject({
-      status: "failed",
-      code: "mount_failed",
-      remediation: expect.stringContaining(
-        "Installer detail: hdiutil attach exited 1: resource busy",
-      ),
-    });
-    if (result.status !== "failed") throw new Error("expected setup failure");
-    expect(result.remediation).not.toContain("\u001b");
-  } finally {
-    await host.close?.();
-    install.mockRestore();
-  }
-});
-
 it("preserves a validated selected JEB endpoint in setup registrations without claiming live readiness", async () => {
   const root = await mkdtemp(join(tmpdir(), "rea-jeb-setup-"));
   const endpoint = "http://127.0.0.1:8425/mcp/";
@@ -220,7 +190,14 @@ it.each([
   "derives Hopper proposal behavior from setup-host facts for $name",
   async ({ environment, providerConfigured, installHopper }) => {
     const doctorHost = createDoctorHostFixture({
-      platform: "darwin",
+      platform: "linux",
+      linuxDistribution: () =>
+        Promise.resolve({
+          id: "ubuntu",
+          versionId: "24.04",
+          packageFamily: "deb",
+          hopperSetupSupported: true,
+        }),
       validTarget: () => Promise.resolve(false),
       executable: () => Promise.resolve(false),
     });

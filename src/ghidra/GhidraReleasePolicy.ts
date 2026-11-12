@@ -1,7 +1,7 @@
 /** Ghidra build whose bridge behavior this REA release verifies. */
-export const SUPPORTED_GHIDRA_VERSION = "12.1.4";
+export const SUPPORTED_GHIDRA_VERSION = "12.2";
 /** Verified JDK major; admission uses the installation's declared bounds. */
-export const SUPPORTED_GHIDRA_JAVA_MAJOR = 21;
+export const SUPPORTED_GHIDRA_JAVA_MAJOR = 25;
 
 /** Numeric Ghidra release read from `application.version`. */
 interface GhidraReleaseVersion {
@@ -32,6 +32,13 @@ type GhidraReleaseCompatibility =
 
 const GHIDRA_RELEASE_PATTERN = /^(\d+)\.(\d+)(?:\.(\d+))?([-+].*)?$/u;
 
+/**
+ * Minimum minor release still admitted on the verified major, kept below the
+ * verified minor so existing 12.1.x installations stay compatible while the
+ * bridge is verified against 12.2.
+ */
+const GHIDRA_ACCEPTED_MINIMUM_MINOR = 1;
+
 /** Classify `application.version` against the verified release line. */
 export const ghidraReleaseCompatibility = (
   raw: string | null | undefined,
@@ -43,11 +50,12 @@ export const ghidraReleaseCompatibility = (
   if (raw === SUPPORTED_GHIDRA_VERSION)
     return { status: "verified", version, raw };
   const verified = verifiedGhidraRelease();
-  // Admit the verified line and anything newer on this major: the observed
+  // Admit the accepted line and anything newer on this major: the observed
   // version is reported on the provider identity and sessions run with the
-  // unverified-build limitation, so a newer release like 12.2 is usable
+  // unverified-build limitation, so a newer release like 12.3 is usable
   // while the verified build stays pinned.
-  return version.major === verified.major && version.minor >= verified.minor
+  return version.major === verified.major &&
+    version.minor >= GHIDRA_ACCEPTED_MINIMUM_MINOR
     ? { status: "compatible", version, raw }
     : { status: "unsupported", version, raw };
 };
@@ -67,7 +75,7 @@ export const unverifiedGhidraBuildLimitation = (
 /** Accepted release floor on this major, such as `12.x (>=12.1)`. */
 export const ghidraReleaseLine = (): string => {
   const verified = verifiedGhidraRelease();
-  return `${String(verified.major)}.x (>=${String(verified.major)}.${String(verified.minor)})`;
+  return `${String(verified.major)}.x (>=${String(verified.major)}.${String(GHIDRA_ACCEPTED_MINIMUM_MINOR)})`;
 };
 
 /** Detail for the installation version check, including the accepted line. */

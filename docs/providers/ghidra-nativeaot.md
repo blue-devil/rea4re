@@ -168,7 +168,7 @@ never prerequisites of ordinary native analysis or setup.
 
 The real MCP lane runs only on a Linux x64 host with the adapter. The
 Windows-host behavior above was checked manually over MCP on Windows 11 x64
-(non-elevated, Ghidra 12.1.4, JDK 21, no JAR) with the source-built win-x64
+(non-elevated, Ghidra 12.2, JDK 25, no JAR) with the source-built win-x64
 symbols fixture. The format, RTR version and frozen strings matched the fixture
 oracle; the derived MethodTable, its base type, its interface and a virtual
 slot reaching the overridden method matched the linker map; and pseudocode was

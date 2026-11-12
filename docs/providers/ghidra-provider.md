@@ -357,9 +357,12 @@ DWARF 4 type-layout object. It proves the admitted operations, external function
 behavior, direct and targetless indirect calls, typed references, strings/xrefs,
 multi-block CFG, bounded p-code def-use/effect links, semantic enhanced workflows, cancellation, startup deadlines,
 serialized concurrency, malformed-target rejection, profile identity, and
-process/project cleanup against real Ghidra 12.1.4. Unit fixtures separately
+process/project cleanup against real Ghidra 12.2. Unit fixtures separately
 cover startup deadlines, process exit, queued cancellation, and malformed wire
-output.
+output. The 12.2 verified-build promotion record — including the RISC-V and
+m68k real lanes that passed on Linux aarch64 and the host-arch entry-aliases
+finding on that host — is kept in
+[verification](../verification/ghidra-12.2-promotion-2026-11-12.md).
 
 `npm run verify:ghidra:cross-format` adds AArch64 ELF, x86-64 PE, and x86-64
 Mach-O target coverage. It requires `clang`, LLD, and `lld-link`; set

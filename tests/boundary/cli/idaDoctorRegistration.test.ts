@@ -95,13 +95,14 @@ cliTest.skipIf(process.platform !== "darwin").for([true, false])(
 
 cliTest.for([
   {
-    name: "native headless lifecycle conflict",
+    name: "unrecognized registration key",
     registration: {
-      mode: "headless",
+      mode: "attached",
       protocol: "native",
       url: "http://127.0.0.1:13337/mcp",
     },
-    constraint: "requires attached mode",
+    constraint:
+      "must contain an IDA MCP command/args or local url registration",
   },
   {
     name: "nonlocal endpoint",

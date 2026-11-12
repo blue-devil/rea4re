@@ -129,15 +129,9 @@ const linuxDoctor = () =>
   });
 
 const installThroughSetup = async (
-  platform: "darwin" | "linux",
   environment: Readonly<NodeJS.ProcessEnv> = {},
 ) => {
-  const host = systemSetupHost(
-    platform === "linux"
-      ? linuxDoctor()
-      : createDoctorHostFixture({ platform: "darwin" }),
-    environment,
-  );
+  const host = systemSetupHost(linuxDoctor(), environment);
   try {
     return await host.installHopper(false);
   } finally {
@@ -145,58 +139,17 @@ const installThroughSetup = async (
   }
 };
 
-it.each([404, 503] as const)(
-  "names the macOS release feed URL and HTTP %i in the setup result",
-  async (status) => {
-    const { fetch } = vendor({ [HOPPER_RELEASES_URL]: failed(status) });
-    expectRequestFailure(
-      await installThroughSetup("darwin"),
-      "download_failed",
-      {
-        request: "release_feed",
-        url: HOPPER_RELEASES_URL,
-        kind: "http_status",
-        httpStatus: status,
-      },
-    );
-    expect(fetch).toHaveBeenCalledOnce();
-  },
-);
-
-it.each([404, 503] as const)(
-  "names the selected macOS DMG URL and HTTP %i in the setup result",
-  async (status) => {
-    const cancel = vi.fn();
-    vendor({
-      [HOPPER_RELEASES_URL]: () => new Response(feed()),
-      [dmgUrl]: failed(status, cancel),
-    });
-    expectRequestFailure(
-      await installThroughSetup("darwin"),
-      "download_failed",
-      {
-        request: "package",
-        url: dmgUrl,
-        kind: "http_status",
-        httpStatus: status,
-      },
-    );
-    expect(cancel).toHaveBeenCalledOnce();
-  },
-);
-
 it("keeps a network failure distinct from an HTTP status in setup", async () => {
   vendor({
-    [HOPPER_RELEASES_URL]: () => new Response(feed()),
-    [dmgUrl]: () => {
+    [HOPPER_RELEASES_URL]: () => {
       throw new TypeError("fetch failed", {
         cause: new Error("getaddrinfo ENOTFOUND www.hopperapp.com"),
       });
     },
   });
-  expectRequestFailure(await installThroughSetup("darwin"), "download_failed", {
-    request: "package",
-    url: dmgUrl,
+  expectRequestFailure(await installThroughSetup(), "download_failed", {
+    request: "release_feed",
+    url: HOPPER_RELEASES_URL,
     kind: "network",
     detail: "fetch failed: getaddrinfo ENOTFOUND www.hopperapp.com",
   });
@@ -206,16 +159,12 @@ it.each([404, 503] as const)(
   "names the Linux publisher release feed URL and HTTP %i in the setup result",
   async (status) => {
     const { fetch } = vendor({ [HOPPER_RELEASES_URL]: failed(status) });
-    expectRequestFailure(
-      await installThroughSetup("linux"),
-      "download_failed",
-      {
-        request: "release_feed",
-        url: HOPPER_RELEASES_URL,
-        kind: "http_status",
-        httpStatus: status,
-      },
-    );
+    expectRequestFailure(await installThroughSetup(), "download_failed", {
+      request: "release_feed",
+      url: HOPPER_RELEASES_URL,
+      kind: "http_status",
+      httpStatus: status,
+    });
     expect(fetch).toHaveBeenCalledOnce();
   },
 );
@@ -230,7 +179,7 @@ it.each([404, 503] as const)(
       [HOPPER_PUBLIC_KEY_URL]: failed(status),
     });
     expectRequestFailure(
-      await installThroughSetup("linux", {
+      await installThroughSetup({
         HOME: root,
         XDG_CACHE_HOME: join(root, "cache"),
       }),
@@ -276,16 +225,12 @@ it.each([404, 503] as const)(
     vi.mocked(systemLinuxHopperInstallHost).mockReturnValueOnce(host);
     const cancel = vi.fn();
     vendor({ [debUrl]: failed(status, cancel) });
-    expectRequestFailure(
-      await installThroughSetup("linux"),
-      "download_failed",
-      {
-        request: "package",
-        url: debUrl,
-        kind: "http_status",
-        httpStatus: status,
-      },
-    );
+    expectRequestFailure(await installThroughSetup(), "download_failed", {
+      request: "package",
+      url: debUrl,
+      kind: "http_status",
+      httpStatus: status,
+    });
     expect(cancel).toHaveBeenCalledOnce();
   },
 );
@@ -346,15 +291,11 @@ it.each([undefined, null, 0, 200, 600, 503.5, "503", Number.NaN])(
       ok: false,
       error: { url: debUrl, kind: "http_status" },
     });
-    expectRequestFailure(
-      await installThroughSetup("darwin"),
-      "download_failed",
-      {
-        request: "release_feed",
-        url: HOPPER_RELEASES_URL,
-        kind: "http_status",
-      },
-    );
+    expectRequestFailure(await installThroughSetup(), "download_failed", {
+      request: "release_feed",
+      url: HOPPER_RELEASES_URL,
+      kind: "http_status",
+    });
   },
 );
 
@@ -398,39 +339,24 @@ it("chooses recovery by failure class: missing file, temporary service failure, 
   ).toBe(4);
 });
 
-it.each([
-  { platform: "darwin", request: "package", url: dmgUrl },
-  { platform: "linux", request: "release_feed", url: HOPPER_RELEASES_URL },
-] as const)(
-  "refuses a credentialed redirect of the $request request without echoing its credentials",
-  async ({ platform, request, url }) => {
-    const { fetch } = vendor({
-      [HOPPER_RELEASES_URL]: () =>
-        url === HOPPER_RELEASES_URL
-          ? new Response(null, {
-              status: 302,
-              headers: { location: credentialed },
-            })
-          : new Response(feed()),
-      [dmgUrl]: () =>
-        new Response(null, {
-          status: 302,
-          headers: { location: credentialed },
-        }),
-    });
-    const result = await installThroughSetup(platform);
-    expectRequestFailure(result, "download_failed", {
-      request,
-      url,
-      kind: "url_refused",
-      refusal: "credentials",
-    });
-    expect(JSON.stringify(result)).not.toMatch(/fixture-(user|secret)/u);
-    expect(fetch.mock.calls.map(([input]) => input)).not.toContain(
-      credentialed,
-    );
-  },
-);
+it("refuses a credentialed release-feed redirect without echoing its credentials", async () => {
+  const { fetch } = vendor({
+    [HOPPER_RELEASES_URL]: () =>
+      new Response(null, {
+        status: 302,
+        headers: { location: credentialed },
+      }),
+  });
+  const result = await installThroughSetup();
+  expectRequestFailure(result, "download_failed", {
+    request: "release_feed",
+    url: HOPPER_RELEASES_URL,
+    kind: "url_refused",
+    refusal: "credentials",
+  });
+  expect(JSON.stringify(result)).not.toMatch(/fixture-(user|secret)/u);
+  expect(fetch.mock.calls.map(([input]) => input)).not.toContain(credentialed);
+});
 
 it("refuses a credentialed request URL before any request and reports it without userinfo", async () => {
   const fetch = vi.fn<typeof globalThis.fetch>();
@@ -462,7 +388,7 @@ it("keeps an observed HTTP status when its truncated body cannot be cancelled", 
         { status: 503 },
       ),
   });
-  expectRequestFailure(await installThroughSetup("darwin"), "download_failed", {
+  expectRequestFailure(await installThroughSetup(), "download_failed", {
     request: "release_feed",
     url: HOPPER_RELEASES_URL,
     kind: "http_status",

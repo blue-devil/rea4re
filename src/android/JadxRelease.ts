@@ -1,10 +1,10 @@
 // Imported directly by pre-install fixture scripts; keep this module dependency-free.
 /** Audited upstream release; source remains unmodified in the Git submodule. */
 export const JADX_RELEASE = Object.freeze({
-  version: "0.7.1",
-  revision: "5844800a486d2248fa949b74c9896285f5b54de2",
-  sha256: "6e5eacf500b64292bfb73c49797c1958f6ee44646e43e868039ae7feb573ff75",
-  url: "https://github.com/1013503897/jadx-headless-mcp/releases/download/v0.7.1/jadx-headless-mcp-0.7.1-all.jar",
+  version: "0.8.0",
+  revision: "2b2a560e8035169f75e3c4f1695e773f9c0eebd0",
+  sha256: "4b9a01c23845c123c217840182d2b5f2c26a7ca20dec3d08810b310fc80a2372",
+  url: "https://github.com/1013503897/jadx-headless-mcp/releases/download/v0.8.0/jadx-headless-mcp-0.8.0-all.jar",
 });
 
 /** Identity of REA's metadata bridge, distinct from the producing engine. */
@@ -26,7 +26,7 @@ export const JADX_JVM_OPTIONS_REMEDIATION =
 
 /** Remediation when the host cannot run the Android JADX subprocess. */
 export const JADX_UNSUPPORTED_HOST_REMEDIATION =
-  "Use Linux, macOS, or Windows x64 with its bundled native controls for Android JADX analysis.";
+  "Use Linux, macOS, or Windows x64 with its bundled native controls for Android JADX analysis. Windows 11 ARM64 hosts run REA under an x64 Node.js process (x64 emulation).";
 
 /** Remediation when the Windows native backend cannot take process ownership. */
 export const JADX_WINDOWS_NATIVE_REMEDIATION =

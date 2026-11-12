@@ -730,7 +730,7 @@ const workflowAvailabilityFor = (
                 : "provider_missing",
           remediation:
             policy.androidAnalysisAvailability?.remediation ??
-            "Set REA_JADX_MCP_JAR to a caller-supplied jadx-headless-mcp 0.7.1 JAR and provide a full JDK on Linux, macOS, or Windows x64 with its matching bundled native controls.",
+            "Set REA_JADX_MCP_JAR to a caller-supplied jadx-headless-mcp 0.8.0 JAR and provide a full JDK on Linux, macOS, or Windows x64 with its matching bundled native controls. Windows 11 ARM64 hosts run REA under an x64 Node.js process (x64 emulation).",
         };
   if (kind === "adb-provider")
     return ownerProbeAvailability(

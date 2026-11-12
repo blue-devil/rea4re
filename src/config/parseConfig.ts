@@ -24,7 +24,6 @@ import { DEFAULT_REGEX_MATCHING_DEADLINE } from "./regexMatchingDeadline.js";
 import { DEFAULT_REGEX_WORKER_HEAP_REQUEST } from "./regexWorkerHeapRequest.js";
 import type { AppConfig } from "./types.js";
 import { hopperLauncherDiscovery } from "../application/HopperLauncherDiscovery.js";
-import { localMacHopperRenamedLauncherCandidates } from "../application/MacHopperPaths.js";
 const executableAvailable = (path: string): boolean => {
   try {
     accessSync(path, constants.X_OK);
@@ -42,11 +41,6 @@ export const defaultHopperLauncherPath = (
   const discovery = hopperLauncherDiscovery(platform, homeDirectory);
   for (const candidate of discovery.candidates)
     if (executable(candidate)) return candidate;
-  if (discovery.probesMacApplicationBundles)
-    for (const candidate of localMacHopperRenamedLauncherCandidates(
-      homeDirectory,
-    ))
-      if (executable(candidate)) return candidate;
   return discovery.fallback;
 };
 

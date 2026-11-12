@@ -36,9 +36,12 @@ The published compatibility experiment used Ghidra **12.1.3**, extension
 **v21.4**, PSPDEV **v20261001** and JDK 21. New public-provider results must be
 reported separately from that historical bridge experiment. The extension's
 `version` property declares its compatible **Ghidra version**, not its release
-tag; the property must match the selected installation. Other same-version
-builds are not described as independently verified merely because they pass
-this metadata check. A malformed or unloadable extension still fails real import.
+tag; the property must match the selected installation, so a Ghidra 12.2
+installation needs an extension built for 12.2 — the v21.4 artifact's metadata
+check does not pass against 12.2, and building it for 12.2 is unverified. Other
+same-version builds are not described as independently verified merely because
+they pass this metadata check. A malformed or unloadable extension still fails
+real import.
 
 REA fingerprints installed extension files before resolving the analysis
 profile and checks that identity again immediately before launch. Symlinks,

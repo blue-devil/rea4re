@@ -5,8 +5,6 @@ import {
   LINUX_HOPPER_SETUP_HOSTS,
   type LinuxDistribution,
 } from "./LinuxHopper.js";
-import { macHopperInstallDisclosure } from "./MacHopper.js";
-import { macHopperUserApplicationPath } from "./MacHopperPaths.js";
 import type {
   ClientConfigurationInspection,
   SetupAction,
@@ -22,17 +20,12 @@ import {
 import { redirectedWriteBlocker } from "./MsixPackageStorage.js";
 import type { DoctorReport } from "./Doctor.js";
 import { compareUnicodeCodePoints } from "../domain/unicodeCodePointOrder.js";
-import { macosMajorVersion } from "../domain/macosVersion.js";
 
 /**
  * Whether automated Hopper installation can run on this host, and why not.
- * `unknown`: the host meets REA's own prerequisites, but the selected release
- * declares its minimum macOS version only in metadata the installer reads
- * after approval, so planning cannot claim the release supports this host.
  */
 export type HopperInstallEligibility =
   | { readonly supported: true }
-  | { readonly supported: "unknown" }
   | { readonly supported: false; readonly remediation: string };
 
 /** Read-only setup facts shared by client selection and preflight. */
@@ -71,9 +64,6 @@ export const discoverSetupState = async (input: {
       : undefined;
   const hopperInstall = hopperInstallEligibility(
     input.host.platform,
-    input.host.platform === "darwin"
-      ? await input.host.macosVersion()
-      : undefined,
     linuxDistribution,
   );
   const installHopper =
@@ -360,24 +350,13 @@ const setupPlan = (input: {
           id: "install_hopper",
           kind: "install_hopper" as const,
           label: "Hopper deep-analysis provider",
-          target:
-            input.platform === "darwin"
-              ? macHopperUserApplicationPath(input.homeDirectory)
-              : "system package manager",
-          detail:
-            input.platform === "linux"
-              ? `Download the current official Hopper demo, verify its PGP publisher and launcher bytes, and retain archive, public-key.asc and release.json under ${input.hopperCacheDirectory ?? `${input.homeDirectory}/.cache/rea/hopper-releases`}/<launcher-sha256> for offline verification. Preserve replaced damaged evidence beside it as <launcher-sha256>.backup-<id>. Install Hopper plus its Xvfb demo-session dependencies${input.linuxPackageFamily === "deb" ? ", including the shared library matching the distribution Python interpreter" : ""}. REA uses a private display and selects Hopper's offered demo mode for each analysis session.`
-              : macHopperInstallDisclosure.detail,
+          target: "system package manager",
+          detail: `Download the current official Hopper demo, verify its PGP publisher and launcher bytes, and retain archive, public-key.asc and release.json under ${input.hopperCacheDirectory ?? `${input.homeDirectory}/.cache/rea/hopper-releases`}/<launcher-sha256> for offline verification. Preserve replaced damaged evidence beside it as <launcher-sha256>.backup-<id>. Install Hopper plus its Xvfb demo-session dependencies${input.linuxPackageFamily === "deb" ? ", including the shared library matching the distribution Python interpreter" : ""}. REA uses a private display and selects Hopper's offered demo mode for each analysis session.`,
           external: true,
           operation: "install" as const,
-          ...(input.platform === "linux"
-            ? input.linuxPackageFamily === undefined
-              ? {}
-              : linuxDisclosure(input.linuxPackageFamily)
-            : {
-                networkOrigins: macHopperInstallDisclosure.networkOrigins,
-                commands: macHopperInstallDisclosure.commands,
-              }),
+          ...(input.linuxPackageFamily === undefined
+            ? {}
+            : linuxDisclosure(input.linuxPackageFamily)),
         },
       ]
     : []),
@@ -440,34 +419,18 @@ export const hopperInstallRefusal = (
 /**
  * Decide automated Hopper installation once from the host facts read during
  * discovery, so proposals, explicit requests, and recovery advice agree. An
- * unknown or unparseable macOS version and an unidentified Linux distribution
- * are not eligible. macOS 12 is REA's own floor; the selected Hopper release's
- * minimum is unknown until the installer reads it.
+ * unidentified Linux distribution is not eligible.
  */
 const hopperInstallEligibility = (
   platform: NodeJS.Platform,
-  macosVersion: string | undefined,
   linuxDistribution: LinuxDistribution | undefined,
-): HopperInstallEligibility => {
-  if (platform === "darwin") {
-    const major = macosMajorVersion(macosVersion);
-    return major !== undefined && major >= 12
-      ? { supported: "unknown" }
-      : { supported: false, remediation: "Upgrade to macOS 12 or newer." };
-  }
-  if (platform === "linux")
-    return linuxDistribution?.hopperSetupSupported === true
-      ? { supported: true }
-      : {
-          supported: false,
-          remediation: `Automated Hopper setup requires ${LINUX_HOPPER_SETUP_HOSTS}; configure an existing supported provider instead.`,
-        };
-  return {
-    supported: false,
-    remediation:
-      "REA supports Hopper on macOS and selected x86_64 Linux distributions.",
-  };
-};
+): HopperInstallEligibility =>
+  platform === "linux" && linuxDistribution?.hopperSetupSupported === true
+    ? { supported: true }
+    : {
+        supported: false,
+        remediation: `Automated Hopper setup requires ${LINUX_HOPPER_SETUP_HOSTS}; configure an existing supported provider instead.`,
+      };
 
 const clientConfigurationDetail = (
   client: SetupClient,

@@ -31,8 +31,6 @@ export const createDoctorHostFixture = (
       ok: true,
       classification: "healthy",
     }),
-  brewHopperPath: () => Promise.resolve(undefined),
-  manualHopperPaths: () => Promise.resolve([]),
   installedSkillIdentity: () =>
     Promise.resolve({
       version: PRODUCT_IDENTITY.skillVersion,

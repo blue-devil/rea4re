@@ -103,7 +103,7 @@ export const windowsNativeFailureRemediation = (
   failureStage: WindowsNativeFailureStage,
 ): string =>
   failureStage === "host"
-    ? "Use a Windows x64 host and a supported Node.js runtime with Node-API 8 or newer."
+    ? "Use a Windows x64 host and a supported Node.js runtime with Node-API 8 or newer. Windows 11 ARM64 hosts run REA under an x64 Node.js process (x64 emulation)."
     : failureStage === "load"
       ? WINDOWS_NATIVE_LOAD_REFUSED_REMEDIATION
       : failureStage === "artifact"
@@ -150,7 +150,10 @@ export const loadWindowsNativeAuthority = (
     return {
       available: false,
       failureStage: "host",
-      reason: "REA Windows native controls require a Windows x64 host.",
+      reason:
+        host.platform === "win32" && host.architecture === "arm64"
+          ? "REA Windows native controls require an x64 REA process. Windows 11 ARM64 hosts must run REA under x64 Node.js (x64 emulation); an arm64-native Node process cannot load the bundled x64 native controls."
+          : "REA Windows native controls require a Windows x64 host.",
     };
   const nodeApiVersion = Number(host.nodeApiVersion);
   if (

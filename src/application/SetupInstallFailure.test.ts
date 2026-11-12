@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { HOPPER_PUBLISHER } from "../domain/hopperPublisher.js";
+import { HOPPER_LINUX_PRIMARY_FINGERPRINT } from "./HopperReleaseFeed.js";
 import { setupInstallFailure } from "./SetupInstallFailure.js";
 
-describe("macOS Hopper setup failure projection", () => {
+describe("Hopper setup failure projection", () => {
   it("projects a publisher mismatch onto its own code and recovery", () => {
     const result = setupInstallFailure("publisher_verification_failed");
     expect(result).toMatchObject({
@@ -11,33 +11,17 @@ describe("macOS Hopper setup failure projection", () => {
       code: "publisher_verification_failed",
     });
     for (const fact of [
-      HOPPER_PUBLISHER.bundleIdentifier,
-      HOPPER_PUBLISHER.teamIdentifier,
-      "HOPPER_LAUNCHER_PATH",
-      "rea setup",
+      HOPPER_LINUX_PRIMARY_FINGERPRINT,
+      "package manager was not run",
+      "retry setup",
     ])
       expect(result.remediation).toContain(fact);
-    expect(result.remediation).toMatch(/nothing was copied or launched/i);
   });
 
-  it("keeps a broken bundle distinct from a publisher mismatch", () => {
-    const result = setupInstallFailure("bundle");
-    expect(result).toMatchObject({ status: "failed", code: "bundle_invalid" });
-    expect(result.remediation).toMatch(/bundle/i);
-    expect(result.remediation).toMatch(/retry setup/i);
-    expect(result.remediation).toMatch(/update REA/i);
-  });
-
-  it("keeps a host below the release minimum distinct from an unsupported host", () => {
-    const incompatible = setupInstallFailure("incompatible_host_version");
-    expect(incompatible).toMatchObject({
-      status: "failed",
-      code: "incompatible_host_version",
-    });
-    expect(incompatible.remediation).toContain("HOPPER_LAUNCHER_PATH");
+  it("keeps an unsupported host distinct", () => {
     const unsupported = setupInstallFailure("unsupported_host");
     expect(unsupported.code).toBe("unsupported_host");
-    expect(incompatible.remediation).not.toBe(unsupported.remediation);
+    expect(unsupported.remediation).toContain("supported host");
   });
 });
 
@@ -96,7 +80,6 @@ describe("Linux package-manager setup failure projection", () => {
 });
 
 it.each([
-  ["destination_inspection", "destination_inspection_failed"],
   ["archive_write", "archive_write_failed"],
   ["launcher_inspection", "launcher_inspection_failed"],
 ] as const)("retains %s as a distinct setup failure", (reason, code) => {

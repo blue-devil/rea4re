@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   parseLinuxHopperReleases,
-  parseMacHopperReleases,
   parseHopperReleaseJson,
 } from "./HopperReleaseFeed.js";
 
@@ -98,18 +97,6 @@ it("retains complete vendor release rows including own special keys and nested o
   expect(Object.hasOwn(parsed.value.deb.value, "constructor")).toBe(true);
 });
 
-it("retains the full selected macOS release row", () => {
-  const row: unknown = JSON.parse(
-    '{"filename":"https://www.hopperapp.com:443/downloader/public/Hopper-demo.dmg","file_length":"123","file_hash":"' +
-      "a".repeat(40) +
-      '","__proto__":{"observed":true},"constructor":"vendor constructor","nested":[{"__proto__":"nested fact"}]}',
-  );
-  const parsed = parseMacHopperReleases({ "OS X": row });
-  if (!parsed.ok) throw new Error("Missing release");
-  expect(JSON.stringify(parsed.value)).toBe(JSON.stringify(row));
-  expect(Object.hasOwn(parsed.value, "__proto__")).toBe(true);
-});
-
 it("distinguishes malformed UTF-8 from a genuine replacement character and tolerates the initial BOM", () => {
   expect(
     parseHopperReleaseJson(
@@ -120,36 +107,4 @@ it("distinguishes malformed UTF-8 from a genuine replacement character and toler
     expect(
       parseHopperReleaseJson(new TextEncoder().encode(bom + '{"x":"雪�"}')),
     ).toMatchObject({ ok: true, value: { x: "雪�" } });
-});
-
-describe("macOS Hopper public download channel", () => {
-  const macRelease = {
-    filename: "https://www.hopperapp.com:443/downloader/public/Hopper-demo.dmg",
-    file_length: "123",
-    file_hash: "a".repeat(40),
-  };
-
-  it.each([
-    "https://www.hopperapp.com/downloader/public/Hopper-demo.dmg",
-    "https://WWW.HOPPERAPP.COM:443/downloader/public/Hopper-demo.dmg",
-    "https://www.hopperapp.com:443/downloader/public/Hopper%20demo.dmg",
-  ])("preserves the admitted source spelling %s", (filename) => {
-    expect(
-      parseMacHopperReleases({ "OS X": { ...macRelease, filename } }),
-    ).toEqual({ ok: true, value: { ...macRelease, filename } });
-  });
-
-  it.each([
-    "https://www.hopperapp.com:443/downloader/public/../private/Hopper-demo.dmg",
-    "https://www.hopperapp.com:443/downloader/public/%2e%2e/private/Hopper-demo.dmg",
-    "https://www.hopperapp.com:443/downloader/public/Hopper-demo.dmg?",
-    "https://www.hopperapp.com:443/downloader/public/Hopper-demo.dmg#",
-    "https://user:password@www.hopperapp.com:443/downloader/public/Hopper-demo.dmg",
-    "https://other.example/downloader/public/Hopper-demo.dmg",
-    "http://www.hopperapp.com/downloader/public/Hopper-demo.dmg",
-  ])("rejects a URL outside the public channel: %s", (filename) => {
-    expect(
-      parseMacHopperReleases({ "OS X": { ...macRelease, filename } }),
-    ).toMatchObject({ ok: false, error: { reason: "release_metadata" } });
-  });
 });

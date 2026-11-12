@@ -11,28 +11,10 @@ afterEach(async () => {
     await rm(root, { recursive: true, force: true });
 });
 
-const session = async (cappedReferences = false) => {
+const session = async () => {
   const { root, target } = await createIdaTarget("arm64");
   roots.push(root);
   const producer = new RecordingIdaMcp(target, "headless");
-  if (cappedReferences) {
-    const inner = producer.overrideCall;
-    producer.overrideCall = (name, args) =>
-      name === "xrefs_to"
-        ? [
-            {
-              xrefs: [
-                {
-                  addr: "0x1004",
-                  type: "code",
-                  fn: { addr: "0x1000", name: "main", size: "0x20" },
-                },
-              ],
-              more: true,
-            },
-          ]
-        : inner?.(name, args);
-  }
   const client = new IdaSessionClient(
     {
       command: "fixture",
@@ -73,26 +55,6 @@ describe("trace_feature on headless IDA", () => {
         ],
         truncated: false,
         residual_unknowns: [],
-      });
-    } finally {
-      expect((await client.close()).ok).toBe(true);
-    }
-  });
-
-  it("keeps an upstream reference cap visible once containment makes the trace run", async () => {
-    const { client } = await session(true);
-    try {
-      const result = await new EnhancedTools(client).execute("trace_feature", {
-        query: "a.b",
-      });
-
-      if (!result.ok) throw result.error;
-      expect(result.value).toMatchObject({
-        references: [{ source_address: "0x1004", containing_procedure: MAIN }],
-        truncated: true,
-        residual_unknowns: [
-          "References to 0x3000 were truncated by the provider; additional references may exist.",
-        ],
       });
     } finally {
       expect((await client.close()).ok).toBe(true);

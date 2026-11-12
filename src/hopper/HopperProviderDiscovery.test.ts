@@ -78,22 +78,6 @@ describe("Hopper provider discovery", () => {
       diagnostics: { target_kind: "archive", target_format: "asar" },
     });
   });
-
-  it("fails closed for saved Hopper databases on macOS without a bridge launch route", () => {
-    expect(
-      provider(process.execPath, "darwin").inspectTargetSupport(
-        databaseTarget(),
-      ),
-    ).toMatchObject({
-      status: "unsupported",
-      code: "target_kind_unsupported",
-      reason: expect.stringContaining("cannot start REA's analysis bridge"),
-      diagnostics: {
-        target_kind: "database",
-        target_format: "analysis-database",
-      },
-    });
-  });
 });
 
 const provider = (

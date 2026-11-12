@@ -90,7 +90,11 @@ const reobservesExternallyMutableState = async (): Promise<void> => {
   const second = await session.execute("procedure_pseudo_code", query);
   expect(second.ok && second.value.result).toContain("99");
   expect(
-    producer.calls.filter(({ name }) => name === "decompile_function"),
+    producer.calls.filter(
+      ({ name, args }) =>
+        name === "execute_python" &&
+        /rea-op:pseudocode/u.test(String(args.code)),
+    ),
   ).toHaveLength(2);
   await session.close();
   expect(producer.closes).toBe(1);
@@ -131,7 +135,7 @@ describe("IDA provider composition", () => {
       (await provider.inspectReadinessSnapshot()).capabilities.find(
         ({ operation }) => operation === "procedure_callers",
       )?.available,
-    ).toBe(false);
+    ).toBe(true);
   });
   it(
     "re-observes externally mutable state even when a document is explicit and a snapshot is imported",
@@ -151,7 +155,8 @@ describe("IDA provider composition", () => {
     );
     const config = parseConfig({ REA_IDA_MCP_CONFIG: path });
     if (!config.ok) throw config.error;
-    const producer = new RecordingIdaMcp(target);
+    const producer = new RecordingIdaMcp(target, "headless");
+    producer.tools = ["execute_python"];
     const provider = new IdaProvider(config.value, {}, () => producer);
     expect(
       provider.inspectTargetSupport({
@@ -172,7 +177,7 @@ describe("IDA provider composition", () => {
       error: {
         _tag: "ProviderAdapterError",
         userMessage: expect.stringContaining(
-          "headless compatibility profile is missing tools: idb_open",
+          "IDA MCP is missing required official ida-mcp tools: open_database",
         ),
       },
     });
@@ -181,8 +186,8 @@ describe("IDA provider composition", () => {
       provider_id: "ida",
       diagnostics: {
         mode: "headless",
-        expected_profile: "database-supervisor",
-        missing_tools: expect.arrayContaining(["idb_open"]),
+        expected_profile: "hexrays",
+        missing_tools: expect.arrayContaining(["open_database"]),
       },
     });
     expect(producer.connects).toBe(1);
@@ -315,17 +320,7 @@ describe("IDA universal Mach-O target identity", () => {
     };
   };
 
-  it.each([
-    { profile: "legacy attached", registration: { command: "fixture" } },
-    {
-      profile: "native attached",
-      registration: {
-        url: "http://127.0.0.1:13337/mcp",
-        mode: "attached",
-        protocol: "native",
-      },
-    },
-  ])(
+  it.each([{ profile: "attached", registration: { command: "fixture" } }])(
     "refuses $profile analysis whose recorded whole-file digest cannot identify the loaded slice",
     async ({ registration }) => {
       const { producer, session, opened } = await openUniversal(registration);

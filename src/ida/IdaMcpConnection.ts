@@ -16,7 +16,6 @@ import {
   IDA_DIAGNOSTIC_SOURCE_BYTES,
 } from "./IdaDiagnosticRedactor.js";
 import { IdaDiagnosticResourceError } from "./IdaDiagnosticWriter.js";
-import { MIMEType } from "node:util";
 import { ChildProcess } from "node:child_process";
 import { Socket } from "node:net";
 import { snapshotEnvironment } from "../process/snapshotEnvironment.js";
@@ -65,10 +64,6 @@ export interface IdaMcpConnection {
       readonly signal?: AbortSignal | undefined;
     },
   ): Promise<JsonValue>;
-  readResource?(
-    uri: string,
-    options?: { readonly signal?: AbortSignal | undefined },
-  ): Promise<JsonValue>;
   serverInfo(): JsonValue;
   close(): Promise<void>;
   /**
@@ -83,40 +78,14 @@ export type IdaMcpConnectionDependencies = Readonly<{
   createDiagnosticRedactor?: typeof createIdaDiagnosticRedactor;
 }>;
 
-const toolResultSchema = mcpToolResultSchema.extend({
-  _meta: z
-    .object({
-      ida_mcp: z
-        .object({
-          output_truncated: z.boolean().optional(),
-          download_hint: z.string().optional(),
-        })
-        .passthrough()
-        .optional(),
-    })
-    .passthrough()
-    .optional(),
-});
-
 const IDA_STDIO_MAX_MESSAGE_BYTES = 64 * 1024 * 1024;
 
-const parseIdaJsonText = (text: string): JsonValue => {
-  let value: unknown;
-  try {
-    value = JSON.parse(text);
-  } catch {
-    throw new AnalysisProtocolError("IDA MCP returned malformed JSON text.");
-  }
-  return jsonValueSchema.parse(value);
-};
-
-/** Decode Python FastMCP's scalar wrapper without dropping structured dictionaries. */
+/** Decode a structured or single-text MCP tool result without dropping producer dictionaries. */
 export const decodeIdaToolResult = (
   input: unknown,
-  protocol?: "native",
   diagnostic: IdaDiagnosticRedactor = createIdaDiagnosticRedactor(),
 ): JsonValue => {
-  const result = toolResultSchema.parse(input);
+  const result = mcpToolResultSchema.parse(input);
   const blocks = mcpTextBlocks(result.content);
   if (result.isError === true) {
     const reason = diagnostic.blocks(blocks);
@@ -127,37 +96,17 @@ export const decodeIdaToolResult = (
       },
     );
   }
-  if (result._meta?.ida_mcp?.output_truncated === true)
-    throw new AnalysisProtocolError(
-      diagnostic.message(
-        "IDA MCP truncated its output; the preview cannot establish a complete observation. ",
-        diagnostic.blocks([
-          result._meta.ida_mcp.download_hint ??
-            "Use the upstream output download workflow to retrieve the full result.",
-        ]),
-      ),
-    );
-  // Native MCP retains the complete JSON text while structuredContent may
-  // contain a shortened preview. Parse that producer-owned representation once.
-  const text = blocks.length === 1 ? blocks[0] : undefined;
-  if (protocol === "native") {
-    if (text === undefined)
-      throw new AnalysisProtocolError(
-        "Native IDA MCP omitted its complete JSON text result.",
-      );
-    return parseIdaJsonText(text);
-  }
   if (result.structuredContent !== undefined) {
     const value = jsonObjectSchema.parse(result.structuredContent);
     return Object.keys(value).length === 1 && Object.hasOwn(value, "result")
       ? value.result!
       : value;
   }
-  if (text === undefined)
+  if (blocks.length !== 1)
     throw new AnalysisProtocolError(
       "IDA MCP omitted a single structured or text result; unsupported content cannot establish an empty observation.",
     );
-  return parseMcpJsonOrText(text);
+  return parseMcpJsonOrText(blocks[0]!);
 };
 
 // Retain only producer-sanitized JSON diagnostics, never a native parser cause.
@@ -558,7 +507,6 @@ export const createIdaMcpConnection = (
                 (entry): entry is [string, string] => entry[1] !== undefined,
               ),
             ),
-            IDA_MCP_MAX_WORKERS: "1",
             ...snapshotEnvironment(config.env),
           },
           stderr: "pipe",
@@ -616,27 +564,8 @@ export const createIdaMcpConnection = (
           if (cause instanceof AnalysisCancelledError) throw cause;
           return transportFailure(cause, name, requestTimeoutMs);
         }),
-        config.protocol,
         redactor,
       );
-    },
-    async readResource(uri, options) {
-      const response = await requestWithCallerSignal(
-        "ida_mcp_read_resource",
-        options?.signal,
-        (signal) =>
-          client.readResource(
-            { uri },
-            {
-              timeout: config.timeoutMs,
-              ...(signal === undefined ? {} : { signal }),
-            },
-          ),
-      ).catch((cause: unknown) => {
-        if (cause instanceof AnalysisCancelledError) throw cause;
-        return transportFailure(cause, "ida_mcp_read_resource");
-      });
-      return decodeIdaJsonResource(uri, response);
     },
     serverInfo: () => jsonValueSchema.parse(client.getServerVersion() ?? null),
     close() {
@@ -691,34 +620,4 @@ export const createIdaMcpConnection = (
         if (stream instanceof Socket) stream.unref();
     },
   };
-};
-
-/** Resource metadata follows the SDK's optional media type; content/identity stay strict. */
-export const decodeIdaJsonResource = (
-  uri: string,
-  response: unknown,
-): JsonValue => {
-  const resource = z
-    .object({
-      contents: z
-        .array(
-          z.object({
-            uri: z.literal(uri),
-            mimeType: z
-              .string()
-              .refine((value) => {
-                try {
-                  return new MIMEType(value).essence === "application/json";
-                } catch {
-                  return false;
-                }
-              }, "Expected a JSON resource media type")
-              .optional(),
-            text: z.string(),
-          }),
-        )
-        .length(1),
-    })
-    .parse(response);
-  return parseIdaJsonText(resource.contents[0]!.text);
 };
