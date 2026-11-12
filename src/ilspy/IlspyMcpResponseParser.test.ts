@@ -23,7 +23,7 @@ describe("parseIlspyToolText", () => {
         SEARCH_STRINGS_RESPONSE.lastIndexOf("[pagination:"),
       ).replace(/\r?\n$/, ""),
     );
-    expect(parsed.value.truncatedFooters).toEqual([]);
+    expect(parsed.value.trailingFooters).toEqual([]);
   });
 
   it("returns null pagination and a verbatim body without a footer", () => {
@@ -31,7 +31,7 @@ describe("parseIlspyToolText", () => {
     if (!parsed.ok) throw parsed.error;
     expect(parsed.value.pagination).toBeNull();
     expect(parsed.value.body).toBe(DECOMPILE_METHOD_RESPONSE);
-    expect(parsed.value.truncatedFooters).toEqual([]);
+    expect(parsed.value.trailingFooters).toEqual([]);
   });
 
   it("preserves truncated:true exactly", () => {
@@ -63,10 +63,10 @@ describe("parseIlspyToolText", () => {
     expect(parsed.error.constraint).toContain("[foo:{a:1}]");
   });
 
-  it("keeps the first of two trailing footers in truncatedFooters", () => {
+  it("keeps the first of two trailing footers in trailingFooters", () => {
     const parsed = parseIlspyToolText(TWO_FOOTER_RESPONSE);
     if (!parsed.ok) throw parsed.error;
-    expect(parsed.value.truncatedFooters).toEqual([
+    expect(parsed.value.trailingFooters).toEqual([
       "[pagination:{total:1,returned:1,truncated:false,offset:0}]",
     ]);
     expect(parsed.value.pagination).toEqual({

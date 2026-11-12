@@ -12,7 +12,7 @@ export type IlspyPagination = {
 export type IlspyToolText = {
   body: string;
   pagination: IlspyPagination | null;
-  truncatedFooters: string[];
+  trailingFooters: string[];
 };
 
 /** The upstream response's trailing footer is not a valid pagination footer. */
@@ -54,7 +54,7 @@ export function parseIlspyToolText(
     rest = split.rest;
   }
   if (footers.length === 0) {
-    return ok({ body: text, pagination: null, truncatedFooters: [] });
+    return ok({ body: text, pagination: null, trailingFooters: [] });
   }
   const last = FOOTER_PATTERN.exec(footers[footers.length - 1]);
   if (last === null) {
@@ -68,6 +68,6 @@ export function parseIlspyToolText(
       truncated: last[3] === "true",
       offset: Number(last[4]),
     },
-    truncatedFooters: footers.slice(0, -1),
+    trailingFooters: footers.slice(0, -1),
   });
 }
