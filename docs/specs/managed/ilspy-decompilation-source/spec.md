@@ -125,6 +125,28 @@ changes.
   ILSpy-MCP is a decompiler producer behind the existing import contract,
   and the workflow is bounded by tools the workflow actually drives.
 
+## Roadmap: the rea4re comprehension paradigm
+
+This spec delivers pillar 1 of the rea4re strategy: decompile (or
+disassemble when needed) first, understand the workflow behind the code,
+collide that comprehension with observed behavior, and rebuild. The later
+pillars are separate future specs, not scope here:
+
+- Pillar 2 (workflow comprehension): a retained, machine-readable
+  comprehension record per target — entry points, call and workflow edges,
+  data flow, and analyst-grade claims — written from decompilation first,
+  shared across the managed and native lanes.
+- Pillar 3 (behavior collision): the comprehension record's claims checked
+  against capture Evidence (`capture_process_scenario`,
+  `correlate_static_and_runtime`), producing confirmed, diverged, and
+  unknown verdicts per claim.
+- Pillar 4 (creation): the obligation ledger driven by the collided
+  comprehension, producing a verified reconstruction and generated source —
+  the "collide and create" step, which has no surface today.
+
+Pillar 1 is shaped to feed pillar 2: decompilation Evidence from this
+workflow is the comprehension record's first-class input.
+
 ## Non-goals
 
 - `export_project` (writes files; caller-choice semantics to design later).

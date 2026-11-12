@@ -186,7 +186,7 @@
 
 **Interfaces:** None.
 
-- [ ] **Step 1:** write provider doc (setup, config shape, catalog check semantics, doctor, workflow example, beta-upstream caveat); guide section with one worked command; README paradigm section per spec (`docs/README.md` conventions).
+- [ ] **Step 1:** write provider doc (setup, config shape, catalog check semantics, doctor, workflow example, beta-upstream caveat); guide section with one worked command; README paradigm section stating the rea4re strategy and its pillars (decompile-first → workflow comprehension → behavior collision → rebuild), with managed .NET analysis named as pillar 1's worked example and pillars 2–4 declared as upcoming.
 - [ ] **Step 2:** `PATH="/usr/local/bin:$PATH" npm run docs:check` — PASS. Commit `docs: ilspy-mcp workflow and rea4re paradigm`.
 
 ### Task 11: Real-provider verification lane
