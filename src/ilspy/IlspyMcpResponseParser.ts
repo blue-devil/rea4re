@@ -56,9 +56,13 @@ export function parseIlspyToolText(
   if (footers.length === 0) {
     return ok({ body: text, pagination: null, trailingFooters: [] });
   }
-  const last = FOOTER_PATTERN.exec(footers[footers.length - 1]);
+  const lastFooter = footers[footers.length - 1];
+  if (lastFooter === undefined) {
+    return ok({ body: text, pagination: null, trailingFooters: [] });
+  }
+  const last = FOOTER_PATTERN.exec(lastFooter);
   if (last === null) {
-    return err(new IlspyResponseParseError(footers[footers.length - 1]));
+    return err(new IlspyResponseParseError(lastFooter));
   }
   return ok({
     body: rest,
