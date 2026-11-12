@@ -113,7 +113,12 @@ describe("ILSpy MCP registration configuration", () => {
     });
     expect(await readIlspyMcpConfiguration(path)).toMatchObject({
       ok: true,
-      value: { command: "ilspy-mcp" },
+      value: {
+        command: "ilspy-mcp",
+        args: [],
+        env: {},
+        timeoutMs: 300_000,
+      },
     });
   });
 
