@@ -129,23 +129,29 @@ changes.
 
 This spec delivers pillar 1 of the rea4re strategy: decompile (or
 disassemble when needed) first, understand the workflow behind the code,
-collide that comprehension with observed behavior, and rebuild. The later
-pillars are separate future specs, not scope here:
+collide that comprehension with observed behavior, and rebuild. The
+paradigm is target-agnostic — it binds every REA lane (managed .NET,
+native ELF/PE/Mach-O, JavaScript/Electron, Android, wasm, firmware), not
+managed code alone. Each lane contributes its own decompilation or
+disassembly evidence; the comprehension contract above them is shared.
+The later pillars are separate future specs, not scope here:
 
-- Pillar 2 (workflow comprehension): a retained, machine-readable
-  comprehension record per target — entry points, call and workflow edges,
-  data flow, and analyst-grade claims — written from decompilation first,
-  shared across the managed and native lanes.
+- Pillar 2 (workflow comprehension): a retained, machine-readable,
+  lane-neutral comprehension record per target — entry points, call and
+  workflow edges, data flow, and analyst-grade claims — written from
+  decompilation first, with one input adapter per lane (ILSpy text for
+  managed, provider pseudo-code for native, recovered sources for
+  JavaScript, jadx for Android).
 - Pillar 3 (behavior collision): the comprehension record's claims checked
   against capture Evidence (`capture_process_scenario`,
-  `correlate_static_and_runtime`), producing confirmed, diverged, and
-  unknown verdicts per claim.
+  `correlate_static_and_runtime`, and the lane's capture surfaces),
+  producing confirmed, diverged, and unknown verdicts per claim.
 - Pillar 4 (creation): the obligation ledger driven by the collided
   comprehension, producing a verified reconstruction and generated source —
   the "collide and create" step, which has no surface today.
 
 Pillar 1 is shaped to feed pillar 2: decompilation Evidence from this
-workflow is the comprehension record's first-class input.
+workflow is the comprehension record's first managed input adapter.
 
 ## Non-goals
 
