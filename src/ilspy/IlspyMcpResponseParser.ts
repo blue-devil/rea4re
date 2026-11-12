@@ -33,7 +33,7 @@ function splitLastLine(text: string): { rest: string; line: string } | null {
     // The whole text is one unterminated line.
     return text.startsWith("[") ? { rest: "", line: text } : null;
   }
-  return { rest: text.slice(0, match.index), line: match[1] };
+  return { rest: text.slice(0, match.index), line: match[1] ?? "" };
 }
 
 /** Parse one ILSpy-MCP plain-text tool response, owning all upstream text interpretation. */
