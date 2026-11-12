@@ -251,6 +251,18 @@ describe("runtime configuration", () => {
       false,
     );
   });
+
+  it("requires an absolute REA_ILSPY_MCP_CONFIG path", () => {
+    expect(
+      parseConfig({ REA_ILSPY_MCP_CONFIG: "/tmp/ilspy-mcp.json" }),
+    ).toMatchObject({
+      ok: true,
+      value: { ilspyMcpConfigPath: "/tmp/ilspy-mcp.json" },
+    });
+    expect(
+      parseConfig({ REA_ILSPY_MCP_CONFIG: "relative/ilspy-mcp.json" }).ok,
+    ).toBe(false);
+  });
 });
 
 describe("native configuration diagnostics", () => {
