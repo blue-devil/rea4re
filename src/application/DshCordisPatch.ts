@@ -8,6 +8,7 @@ import {
 import { ConfigurationError } from "../domain/configurationErrors.js";
 import { err, ok, type Result } from "../domain/result.js";
 import type { ClientConfigurationDocument } from "./ClientConfigurationDocument.js";
+import { PRODUCT_IDENTITY } from "../identity.js";
 import { CordisExpression, DshCordisYaml } from "./DshCordisYaml.js";
 import {
   mergeEnvironmentOverrides,
@@ -480,9 +481,9 @@ export const dshClientRegistrationEntry = (
   command: readonly string[],
   environment: Readonly<Record<string, string>> = {},
 ): Record<string, unknown> => {
-  const [executable = "rea", ...args] = command;
+  const [executable = PRODUCT_IDENTITY.cliBinary, ...args] = command;
   return {
-    serverName: "rea",
+    serverName: PRODUCT_IDENTITY.mcpServerKey,
     transport: "stdio",
     command: executable,
     args,

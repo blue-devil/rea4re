@@ -39,7 +39,7 @@ it("resolves enabled builtin scopes in the same tree as registered commands", ()
   expect(complete(["rea", "mcp", ""])).toEqual(["add", "doctor"]);
   expect(complete(["rea", "mcp", "d"])).toEqual(["doctor"]);
   expect(complete(["rea", "mcp", "ad"])).toEqual(["add"]);
-  expect(complete(["rea", "mcp"], 2)).toEqual(["add", "doctor"]);
+  expect(complete(["rea4re", "mcp"], 2)).toEqual(["add", "doctor"]);
   expect(complete(["rea", ""])).toEqual(["instructions", "mcp", "completions"]);
   expect(complete(["rea", "completions", "b"])).toEqual(["bash"]);
   expect(complete(["rea", "mcp", "add", "--c"])).toEqual([
@@ -170,11 +170,11 @@ workspaceCliTest.skipIf(process.platform !== "darwin")(
         "-f",
         "-c",
         `
-rea() { "$REA_TEST_NODE" "$REA_TEST_DISPATCHER" "$@"; }
+rea4re() { "$REA_TEST_NODE" "$REA_TEST_DISPATCHER" "$@"; }
 autoload -Uz compinit
 compinit -i -D
-eval "$(rea completions zsh)" || exit
-print -r -- "association=\${+_comps[rea]}"
+eval "$(rea4re completions zsh)" || exit
+print -r -- "association=\${+_comps[rea4re]}"
 `,
       ],
       { env: environment },
@@ -195,19 +195,19 @@ workspaceCliTest.skipIf(process.platform === "win32")(
         "--norc",
         "-c",
         `
-rea() { "$REA_TEST_NODE" "$REA_TEST_DISPATCHER" "$@"; }
-eval "$(rea completions bash)" || exit
-COMP_WORDS=(rea mcp "")
+rea4re() { "$REA_TEST_NODE" "$REA_TEST_DISPATCHER" "$@"; }
+eval "$(rea4re completions bash)" || exit
+COMP_WORDS=(rea4re mcp "")
 COMP_CWORD=2
-_incur_complete_rea || exit
+_incur_complete_rea4re || exit
 printf 'mcp=%s\\n' "\${COMPREPLY[*]}"
-COMP_WORDS=(rea instructions --format "")
+COMP_WORDS=(rea4re instructions --format "")
 COMP_CWORD=3
-_incur_complete_rea || exit
+_incur_complete_rea4re || exit
 printf 'format=%s\\n' "\${COMPREPLY[*]}"
-COMP_WORDS=(rea mcp doctor --)
+COMP_WORDS=(rea4re mcp doctor --)
 COMP_CWORD=3
-_incur_complete_rea || exit
+_incur_complete_rea4re || exit
 printf 'doctor=%s\\n' "\${COMPREPLY[*]}"
 `,
       ],

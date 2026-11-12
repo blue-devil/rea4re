@@ -16,7 +16,7 @@ it("finds and retrieves the selected section from the generated package bundle",
     expect(result.value).toMatchObject({
       status: "matches",
       source: "installed_rea_guidance",
-      package: expect.stringMatching(/^rea-agents@/u),
+      package: expect.stringMatching(/^rea4re@/u),
     });
     if (result.value.status !== "matches")
       throw new Error("Expected guidance matches");

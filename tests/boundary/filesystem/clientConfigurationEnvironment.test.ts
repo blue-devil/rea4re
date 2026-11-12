@@ -28,14 +28,14 @@ import { ok } from "../../../src/domain/result.js";
 import { MCP_STARTUP_POLICY } from "../../../src/mcpStartupPolicy.js";
 import { supportedClientRegistrationProfile } from "../../../src/application/SupportedClients.js";
 
-const staleOwnedCommand = ["npx", "-y", "rea-agents@6.6.0", "mcp"] as const;
+const staleOwnedCommand = ["npx", "-y", "rea4re@6.6.0", "mcp"] as const;
 
 it("awaits the owner-parsed provider request budget without changing caller strings", async () => {
   const parsed = parseClientConfiguration(
     JSON.stringify({
       mcpServers: {
         rea: {
-          command: "rea",
+          command: "rea4re",
           args: ["mcp"],
           env: {
             REA_ANALYSIS_PROVIDER: "ida",
@@ -76,7 +76,7 @@ it("preserves owner-parsed registration facts and revalidates later inspections"
   const original = JSON.stringify({
     mcpServers: {
       rea: {
-        command: "rea",
+        command: "rea4re",
         args: ["mcp"],
         env: environment,
         startupTimeoutMs: MCP_STARTUP_POLICY.kimiStartupTimeoutMs,
@@ -106,17 +106,32 @@ it("preserves owner-parsed registration facts and revalidates later inspections"
   };
 
   expect(
-    await clientConfigurationAligned(client, {}, ["rea", "mcp"], resolveBudget),
+    await clientConfigurationAligned(
+      client,
+      {},
+      ["rea4re", "mcp"],
+      resolveBudget,
+    ),
   ).toBe(true);
   expect(observedBudgets.has(17)).toBe(true);
 
   expect(
-    await inspectClientConfiguration(client, {}, ["rea", "mcp"], resolveBudget),
+    await inspectClientConfiguration(
+      client,
+      {},
+      ["rea4re", "mcp"],
+      resolveBudget,
+    ),
   ).toEqual({ status: "already_current" });
   providerTimeoutMs = 1_000_000;
   // Revalidate the budget while preserving the caller's positive timeout.
   expect(
-    await inspectClientConfiguration(client, {}, ["rea", "mcp"], resolveBudget),
+    await inspectClientConfiguration(
+      client,
+      {},
+      ["rea4re", "mcp"],
+      resolveBudget,
+    ),
   ).toEqual({ status: "already_current" });
   expect(observedBudgets.has(providerTimeoutMs)).toBe(true);
   expect(await readFile(configPath, "utf8")).toBe(original);
@@ -188,7 +203,7 @@ it.skipIf(process.platform !== "win32").each([
     const result = await configureClientConfiguration(
       client,
       { [override]: value },
-      ["rea", "mcp"],
+      ["rea4re", "mcp"],
     );
     expect(result, JSON.stringify(result)).toMatchObject({
       status: "configured",
@@ -297,7 +312,7 @@ it
     if (!details.ok) throw details.error;
     expect(details.value.timeoutInputs?.analysisProvider).toBe("ghidra");
     expect(
-      await configureClientConfiguration(client, overrides, ["rea", "mcp"]),
+      await configureClientConfiguration(client, overrides, ["rea4re", "mcp"]),
     ).toEqual({ status: "unchanged" });
   },
 );
@@ -318,7 +333,9 @@ it.skipIf(process.platform !== "win32").each([
   ({ existing, overrides, expected }) => {
     const parsed = parseClientConfiguration(
       JSON.stringify({
-        mcpServers: { rea: { command: "rea", args: ["mcp"], env: existing } },
+        mcpServers: {
+          rea: { command: "rea4re", args: ["mcp"], env: existing },
+        },
       }),
       "json",
     );
@@ -357,7 +374,7 @@ it.skipIf(process.platform !== "win32")(
     const original = JSON.stringify({
       mcpServers: {
         rea: {
-          command: "rea",
+          command: "rea4re",
           args: ["mcp"],
           env: { rea_analysis_provider: "invalid provider" },
         },
@@ -372,7 +389,7 @@ it.skipIf(process.platform !== "win32")(
         configPath,
       },
       {},
-      ["rea", "mcp"],
+      ["rea4re", "mcp"],
     );
     expect(result).toMatchObject({ status: "failed" });
     expect(await readFile(configPath, "utf8")).toBe(original);
@@ -429,7 +446,7 @@ it.each([
     const originalParsed = parseClientConfiguration(original, format);
     await writeFile(configPath, original);
     const providers = { GHIDRA_INSTALL_DIR: join(root, "new-ghidra") };
-    const command = ["rea", "mcp"];
+    const command = ["rea4re", "mcp"];
     expect(
       await inspectClientConfiguration(client, providers, command),
     ).toMatchObject({ status: "update" });
@@ -476,7 +493,7 @@ it.each(["linux", "win32"] as const)(
       config:
         serverName: rea
         transport: stdio
-        command: rea
+        command: rea4re
         args: [mcp]
         env:
           "__proto__": selected
@@ -693,7 +710,7 @@ it("rejects a non-string caller environment key before editing configuration", a
   const root = await createTestTempDirectory("rea-invalid-own-environment-");
   const configPath = join(root, "config.json");
   const source =
-    '{"mcpServers":{"rea":{"command":"rea","args":["mcp"],"env":{"__proto__":123}}}}';
+    '{"mcpServers":{"rea":{"command":"rea4re","args":["mcp"],"env":{"__proto__":123}}}}';
   await writeFile(configPath, source);
   const details = clientRegistrationEnvironmentDetails(
     parseClientConfiguration(source, "json"),
@@ -712,7 +729,7 @@ it("rejects a non-string caller environment key before editing configuration", a
         configPath,
       },
       {},
-      ["rea", "mcp"],
+      ["rea4re", "mcp"],
     ),
   ).toEqual({ status: "failed", reason: "readback" });
   expect(await readFile(configPath, "utf8")).toBe(source);
@@ -727,7 +744,7 @@ it("does not hide an invalid JEB endpoint in an untouched configuration layer", 
   const configPath = join(root, "opencode.json");
   const bad = JSON.stringify({
     mcp: {
-      rea: clientRegistrationEntry("opencode", ["rea", "mcp"], {
+      rea: clientRegistrationEntry("opencode", ["rea4re", "mcp"], {
         REA_JEB_MCP_URL: "https://example.com/mcp",
       }),
     },
@@ -743,7 +760,7 @@ it("does not hide an invalid JEB endpoint in an untouched configuration layer", 
   } as const;
   const selected = { REA_JEB_MCP_URL: "http://127.0.0.1:8426/mcp" };
   expect(
-    await inspectClientConfiguration(client, selected, ["rea", "mcp"]),
+    await inspectClientConfiguration(client, selected, ["rea4re", "mcp"]),
   ).toMatchObject({
     status: "invalid",
     remediation: expect.stringContaining(lower),
@@ -774,7 +791,7 @@ it("retains legacy OpenCode environment when migrating into a native server tabl
     }),
   );
   expect(
-    await configureClientConfiguration(client, {}, ["rea", "mcp"]),
+    await configureClientConfiguration(client, {}, ["rea4re", "mcp"]),
   ).toMatchObject({ status: "configured" });
   const parsed = parseClientConfiguration(
     await readFile(configPath, "utf8"),
@@ -782,10 +799,10 @@ it("retains legacy OpenCode environment when migrating into a native server tabl
   );
   expect(parsed.legacyServers).toEqual({});
   expect(parsed.servers.rea).toEqual(
-    clientRegistrationEntry("opencode_v2", ["rea", "mcp"], custom),
+    clientRegistrationEntry("opencode_v2", ["rea4re", "mcp"], custom),
   );
   expect(
-    await configureClientConfiguration(client, {}, ["rea", "mcp"]),
+    await configureClientConfiguration(client, {}, ["rea4re", "mcp"]),
   ).toEqual({ status: "unchanged" });
 });
 
@@ -941,7 +958,7 @@ it.each([
     const configPath = join(directory, "mcp.json");
     await mkdir(directory);
     const original = JSON.stringify({
-      mcpServers: { rea: { command: "rea", args: ["mcp"], env } },
+      mcpServers: { rea: { command: "rea4re", args: ["mcp"], env } },
     });
     await writeFile(configPath, original);
     const client = {
@@ -951,17 +968,17 @@ it.each([
       configPath,
     } as const;
     expect(
-      await inspectClientConfiguration(client, {}, ["rea", "mcp"]),
+      await inspectClientConfiguration(client, {}, ["rea4re", "mcp"]),
     ).toMatchObject({
       status: "invalid",
       remediation: expect.stringContaining(setting),
     });
     expect(
-      await configureClientConfiguration(client, {}, ["rea", "mcp"]),
+      await configureClientConfiguration(client, {}, ["rea4re", "mcp"]),
     ).toEqual({ status: "failed", reason: "readback" });
-    expect(await clientConfigurationAligned(client, {}, ["rea", "mcp"])).toBe(
-      false,
-    );
+    expect(
+      await clientConfigurationAligned(client, {}, ["rea4re", "mcp"]),
+    ).toBe(false);
     const statuses = await readClientRegistrationStatuses(home, "rea", {
       environment: {},
     });
@@ -1003,7 +1020,7 @@ it("treats a variable-expanding client's recorded expression as unresolved", () 
     JSON.stringify({
       mcpServers: {
         rea: {
-          command: "rea",
+          command: "rea4re",
           args: ["mcp"],
           env: { PATH: "${PATH}:/opt/jdk/bin", JAVA_HOME: "/opt/jdk" },
         },
@@ -1036,7 +1053,7 @@ it("keeps a typed Qwen setting unresolved without discarding its recorded expres
     JSON.stringify({
       mcpServers: {
         rea: {
-          command: "rea",
+          command: "rea4re",
           args: ["mcp"],
           env: { REA_GHIDRA_STARTUP_TIMEOUT_MS: "${JOBS}" },
         },
@@ -1061,7 +1078,7 @@ it("keeps a differently cased Qwen expression unresolved on Windows", () => {
     JSON.stringify({
       mcpServers: {
         rea: {
-          command: "rea",
+          command: "rea4re",
           args: ["mcp"],
           env: { rea_ghidra_startup_timeout_ms: "${JOBS}" },
         },

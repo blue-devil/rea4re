@@ -121,7 +121,7 @@ cliTest(
       mcpServers: {
         rea: {
           command: "npx",
-          args: ["-y", "rea-agents@6.6.0", "mcp"],
+          args: ["-y", "rea4re@6.6.0", "mcp"],
           env: { CUSTOM: "keep" },
         },
         peer: { command: "peer" },
@@ -152,7 +152,7 @@ for (const repeated of [false, true])
       const config = join(home, ".config", "opencode", "opencode.json");
       await mkdir(dirname(config), { recursive: true });
       const foreign = '"rea":{"type":"local","command":["other"]}';
-      const owned = '"rea":{"type":"local","command":["rea","mcp"]}';
+      const owned = '"rea":{"type":"local","command":["rea4re","mcp"]}';
       const original = `{"mcp":{${foreign},${repeated ? `${owned},` : ""}"servers":{${owned}}}}`;
       await writeFile(config, original);
       const result = await cli.run({
@@ -272,7 +272,7 @@ cliTest(
     const lower = join(directory, "config.json");
     const upper = join(directory, "opencode.json");
     const originalLower = JSON.stringify({
-      mcp: { rea: { type: "local", command: ["rea", "mcp"] } },
+      mcp: { rea: { type: "local", command: ["rea4re", "mcp"] } },
     });
     const originalUpper = JSON.stringify({
       mcp: { rea: { environment: { CUSTOM: "keep" } } },

@@ -22,12 +22,12 @@ it("registers VS Code in VSCODE_APPDATA and preserves its configuration", async 
   expect(client).toBeDefined();
   if (client === undefined) throw new Error("VS Code client missing");
   expect(
-    await configureClientConfiguration(client, {}, ["rea", "mcp"]),
+    await configureClientConfiguration(client, {}, ["rea4re", "mcp"]),
   ).toMatchObject({ status: "configured" });
   expect(parse(await readFile(expectedPath, "utf8"))).toMatchObject({
     servers: {
       other: { command: "other" },
-      rea: { command: "rea", args: ["mcp"] },
+      rea: { command: "rea4re", args: ["mcp"] },
     },
   });
   expect(await readFile(expectedPath, "utf8")).toContain(
@@ -35,7 +35,7 @@ it("registers VS Code in VSCODE_APPDATA and preserves its configuration", async 
   );
   expect(await readFile(`${expectedPath}.rea.backup`, "utf8")).toBe(original);
   expect(
-    await configureClientConfiguration(client, {}, ["rea", "mcp"]),
+    await configureClientConfiguration(client, {}, ["rea4re", "mcp"]),
   ).toMatchObject({ status: "unchanged" });
   await expect(access(join(home, ".config", "Code"))).rejects.toMatchObject({
     code: "ENOENT",
@@ -74,10 +74,10 @@ it.each([
   expect(client?.configPath).toBe(expectedPath);
   if (client === undefined) throw new Error("VS Code client missing");
   expect(
-    await configureClientConfiguration(client, {}, ["rea", "mcp"]),
+    await configureClientConfiguration(client, {}, ["rea4re", "mcp"]),
   ).toMatchObject({ status: "configured" });
   expect(parse(await readFile(expectedPath, "utf8"))).toMatchObject({
-    servers: { rea: { command: "rea" } },
+    servers: { rea: { command: "rea4re" } },
   });
   await expect(access(join(home, ".config", "Code"))).rejects.toMatchObject({
     code: "ENOENT",

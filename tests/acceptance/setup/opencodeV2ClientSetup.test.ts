@@ -32,7 +32,7 @@ const layeredOpenCode = async (
       servers: {
         rea: {
           type: "local",
-          command: ["rea", "mcp"],
+          command: ["rea4re", "mcp"],
           disabled,
           environment: { REA_MCP_OUTPUT_SCHEMA_PROFILE: "off" },
         },

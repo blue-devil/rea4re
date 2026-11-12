@@ -720,7 +720,7 @@ it.skipIf(process.platform === "win32")(
     await writeFile(join(packed, "rea-prod", "scripts", "rea.mjs"), "");
     await writeFile(
       join(packed, "rea-prod/package.json"),
-      JSON.stringify({ name: "rea-agents", version: "6.7.0" }),
+      JSON.stringify({ name: "rea4re", version: "6.7.0" }),
     );
     const archive = join(root, "rea-prod.tar.xz");
     await execute("tar", ["-cJf", archive, "-C", packed, "rea-prod"]);

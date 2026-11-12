@@ -15,7 +15,7 @@
   ],
   "packages": {
     ".": {
-      "package-name": "rea-agents",
+      "package-name": "rea4re",
       "extra-files": [
         { "type": "generic", "path": "docs/getting-started/installation.md" },
         {

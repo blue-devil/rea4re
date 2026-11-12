@@ -81,13 +81,13 @@ it.skipIf(process.platform === "win32")(
       configPath: existing,
     } as const;
     expect(
-      await configureClientConfiguration(client, {}, ["rea", "mcp"]),
+      await configureClientConfiguration(client, {}, ["rea4re", "mcp"]),
     ).toMatchObject({ status: "configured" });
     expect((await lstat(existing)).mode & 0o777).toBe(0o640);
     expect((await lstat(`${existing}.rea.backup`)).mode & 0o777).toBe(0o640);
     expect(await readFile(`${existing}.rea.backup`, "utf8")).toBe(original);
     expect(
-      await configureClientConfiguration(client, {}, ["rea", "mcp"]),
+      await configureClientConfiguration(client, {}, ["rea4re", "mcp"]),
     ).toMatchObject({ status: "unchanged" });
     expect((await lstat(existing)).mode & 0o777).toBe(0o640);
 
@@ -142,7 +142,7 @@ describe("uninstall backups after edits made since setup", () => {
     const beforeSetup = '{"keep":"before setup"}\n';
     await writeFile(configPath, beforeSetup);
     expect(
-      await configureClientConfiguration(client, {}, ["rea", "mcp"]),
+      await configureClientConfiguration(client, {}, ["rea4re", "mcp"]),
     ).toMatchObject({ status: "configured" });
     const configured = JSON.parse(await readFile(configPath, "utf8")) as Record<
       string,
@@ -288,7 +288,7 @@ it("accepts a literal UTF-8 replacement character without changing its value", a
       configPath,
     },
     {},
-    ["rea", "mcp"],
+    ["rea4re", "mcp"],
   );
   expect(result.status).toBe("configured");
   expect(
@@ -314,13 +314,15 @@ it("previews and creates a current recovery backup while preserving the first ba
   const recoveryPath = `${configPath}.rea.backup.${createHash("sha256")
     .update(currentOriginal, "utf8")
     .digest("hex")}.recovery`;
-  expect(await inspectClientConfiguration(client, {}, ["rea", "mcp"])).toEqual({
+  expect(
+    await inspectClientConfiguration(client, {}, ["rea4re", "mcp"]),
+  ).toEqual({
     status: "update",
     backupPath: recoveryPath,
   });
 
   expect(
-    await configureClientConfiguration(client, {}, ["rea", "mcp"]),
+    await configureClientConfiguration(client, {}, ["rea4re", "mcp"]),
   ).toEqual({ status: "configured", backupPath: recoveryPath });
   expect(await readFile(`${configPath}.rea.backup`, "utf8")).toBe(
     firstOriginal,
@@ -347,13 +349,13 @@ it("blocks configuration when the planned content-addressed backup is occupied",
   await writeFile(recoveryPath, "occupied by other data");
 
   expect(
-    await inspectClientConfiguration(client, {}, ["rea", "mcp"]),
+    await inspectClientConfiguration(client, {}, ["rea4re", "mcp"]),
   ).toMatchObject({
     status: "invalid",
     remediation: expect.stringContaining(recoveryPath),
   });
   expect(
-    await configureClientConfiguration(client, {}, ["rea", "mcp"]),
+    await configureClientConfiguration(client, {}, ["rea4re", "mcp"]),
   ).toEqual({ status: "failed", reason: "backup" });
   expect(await readFile(configPath, "utf8")).toBe(currentOriginal);
   expect(await readFile(`${configPath}.rea.backup`, "utf8")).toBe(
@@ -402,7 +404,7 @@ describe("TOML client configuration comparison", () => {
     const value = "-inf";
     const root = await createTestTempDirectory("rea-client-toml-");
     const configPath = join(root, "config.toml");
-    const original = `unrelated = ${value}\n[mcp_servers.rea]\ncommand = "npx"\nargs = ["-y", "rea-agents@6.1.0", "mcp"]\nstartup_timeout_sec = ${value}\n`;
+    const original = `unrelated = ${value}\n[mcp_servers.rea]\ncommand = "npx"\nargs = ["-y", "rea4re@6.1.0", "mcp"]\nstartup_timeout_sec = ${value}\n`;
     await writeFile(configPath, original);
     const client = {
       name: "codex",
@@ -411,7 +413,7 @@ describe("TOML client configuration comparison", () => {
       configPath,
     } as const;
     expect(
-      await configureClientConfiguration(client, {}, ["rea", "mcp"]),
+      await configureClientConfiguration(client, {}, ["rea4re", "mcp"]),
     ).toEqual({
       status: "configured",
       backupPath: `${configPath}.rea.backup`,
@@ -421,7 +423,7 @@ describe("TOML client configuration comparison", () => {
       `unrelated = ${value}`,
     );
     expect(
-      await configureClientConfiguration(client, {}, ["rea", "mcp"]),
+      await configureClientConfiguration(client, {}, ["rea4re", "mcp"]),
     ).toEqual({
       status: "unchanged",
     });
@@ -462,17 +464,17 @@ describe("Codex configuration text preservation", () => {
     },
     {
       name: "quoted tables and nested environment",
-      original: `${unrelatedToml}[mcp_servers."rea"]\ncommand = "npx"\nargs = ["-y", "rea-agents@6.1.0", "mcp"]\n[mcp_servers.rea.env]\nOLD = "value"\n${unrelatedServer}`,
+      original: `${unrelatedToml}[mcp_servers."rea"]\ncommand = "npx"\nargs = ["-y", "rea4re@6.1.0", "mcp"]\n[mcp_servers.rea.env]\nOLD = "value"\n${unrelatedServer}`,
       preserved: [unrelatedToml, unrelatedServer],
     },
     {
       name: "dotted registration keys",
-      original: `${unrelatedToml}mcp_servers.rea.command = "npx"\nmcp_servers.rea.args = ["-y", "rea-agents@6.1.0", "mcp"]\n${unrelatedServer}`,
+      original: `${unrelatedToml}mcp_servers.rea.command = "npx"\nmcp_servers.rea.args = ["-y", "rea4re@6.1.0", "mcp"]\n${unrelatedServer}`,
       preserved: [unrelatedToml, unrelatedServer],
     },
     {
       name: "inline server table",
-      original: `${unrelatedToml}mcp_servers = { rea = { command = "npx", args = ["-y", "rea-agents@6.1.0", "mcp"] }, other = { command = 'other' } } # Shared table.\n`,
+      original: `${unrelatedToml}mcp_servers = { rea = { command = "npx", args = ["-y", "rea4re@6.1.0", "mcp"] }, other = { command = 'other' } } # Shared table.\n`,
       preserved: [
         unrelatedToml,
         "other = { command = 'other' }",
@@ -510,7 +512,7 @@ describe("Codex configuration text preservation", () => {
       await writeFile(configPath, original);
 
       expect(
-        await configureClientConfiguration(client, {}, ["rea", "mcp"]),
+        await configureClientConfiguration(client, {}, ["rea4re", "mcp"]),
       ).toMatchObject({ status: "configured" });
       const configured = await readFile(configPath, "utf8");
       for (const text of preserved) expect(configured).toContain(text);
@@ -519,7 +521,7 @@ describe("Codex configuration text preservation", () => {
         original.startsWith("\uFEFF"),
       );
       expect(
-        await configureClientConfiguration(client, {}, ["rea", "mcp"]),
+        await configureClientConfiguration(client, {}, ["rea4re", "mcp"]),
       ).toEqual({ status: "unchanged" });
       expect(await readFile(configPath, "utf8")).toBe(configured);
 
@@ -546,12 +548,12 @@ describe("Codex configuration text preservation", () => {
     } as const;
     const original = 'notify = ["a", "b"]\n';
     await writeFile(configPath, original);
-    await configureClientConfiguration(client, {}, ["rea", "mcp"]);
+    await configureClientConfiguration(client, {}, ["rea4re", "mcp"]);
     expect((await systemUninstallHost(root).removeClient(client)).status).toBe(
       "removed",
     );
     expect(await readFile(`${configPath}.rea.backup`, "utf8")).toBe(original);
-    await configureClientConfiguration(client, {}, ["rea", "mcp"]);
+    await configureClientConfiguration(client, {}, ["rea4re", "mcp"]);
     expect(await readFile(`${configPath}.rea.backup`, "utf8")).toBe(original);
   });
 
@@ -568,7 +570,7 @@ describe("Codex configuration text preservation", () => {
       "# Keep this explanation.\n[mcp_servers.rea]\ncommand = [broken\n";
     await writeFile(configPath, original);
     expect(
-      await configureClientConfiguration(client, {}, ["rea", "mcp"]),
+      await configureClientConfiguration(client, {}, ["rea4re", "mcp"]),
     ).toEqual({ status: "failed", reason: "readback" });
     expect((await systemUninstallHost(root).removeClient(client)).status).toBe(
       "failed",
@@ -589,7 +591,7 @@ it
     const configPath = join(root, "config.json");
     await writeFile(
       configPath,
-      '{"mcpServers":{"rea":{"command":"rea","args":["mcp"]}},"keep":true}\n',
+      '{"mcpServers":{"rea":{"command":"rea4re","args":["mcp"]}},"keep":true}\n',
     );
     await chmod(configPath, mode);
     const host = systemUninstallHost(root);

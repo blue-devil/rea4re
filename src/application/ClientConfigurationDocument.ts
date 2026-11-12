@@ -1985,7 +1985,7 @@ export const clientRegistrationLauncherEntry = (
   format: ClientRegistrationDialect,
   command: readonly string[],
 ): Record<string, unknown> => {
-  const [executable = "rea", ...args] = command;
+  const [executable = PRODUCT_IDENTITY.cliBinary, ...args] = command;
   switch (format) {
     case "opencode":
     case "opencode_v2":

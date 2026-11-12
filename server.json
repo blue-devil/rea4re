@@ -13,7 +13,7 @@
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
-      "identifier": "rea-agents",
+      "identifier": "rea4re",
       "version": "6.8.0",
       "runtimeHint": "npx",
       "transport": {

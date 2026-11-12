@@ -27,7 +27,7 @@ for (const [setting, profile] of [
         mcpServers: {
           rea: {
             type: "stdio",
-            command: "rea",
+            command: "rea4re",
             args: ["mcp"],
             env: { [setting]: profile },
           },
@@ -96,7 +96,7 @@ cliTest(
         rea: {
           type: "stdio",
           command: "npx",
-          args: ["-y", "rea-agents@1.0.0", "mcp"],
+          args: ["-y", "rea4re@1.0.0", "mcp"],
           env: custom,
         },
       },

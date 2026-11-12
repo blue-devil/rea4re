@@ -832,7 +832,10 @@ export const systemDoctorHost = (
     async installationPaths() {
       try {
         const command = platform === "win32" ? "where" : "which";
-        const arguments_ = platform === "win32" ? ["rea"] : ["-a", "rea"];
+        const arguments_ =
+          platform === "win32"
+            ? [PRODUCT_IDENTITY.cliBinary]
+            : ["-a", PRODUCT_IDENTITY.cliBinary];
         return uniqueLines(
           (await hostExecFileOutput(command, arguments_, commandEnvironment))
             .stdout,

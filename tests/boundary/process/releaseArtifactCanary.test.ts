@@ -38,7 +38,7 @@ async function prepareController(controller: string, version: string) {
   });
   await writeFile(
     join(controller, "package.json"),
-    JSON.stringify({ name: "rea-agents", version, type: "module" }),
+    JSON.stringify({ name: "rea4re", version, type: "module" }),
   );
   await symlink(
     resolve("node_modules"),
@@ -83,7 +83,7 @@ processTest.skipIf(process.platform === "win32")(
     await writeFile(
       join(candidate, "package.json"),
       JSON.stringify({
-        name: "rea-agents",
+        name: "rea4re",
         version,
         type: "module",
         files: ["scripts"],
@@ -150,7 +150,7 @@ if (process.argv[2] === "mcp") {
     expect(successful.exitCode, successful.stderr).toBe(0);
     const result = JSON.parse(successful.stdout);
     expect(result).toMatchObject({
-      package: "rea-agents",
+      package: "rea4re",
       version,
       source: tarball,
       mcpTools: snapshot.tools.tools.length,
@@ -174,7 +174,7 @@ if (process.argv[2] === "mcp") {
     await writeFile(
       join(candidate, "package.json"),
       JSON.stringify({
-        name: "rea-agents",
+        name: "rea4re",
         version: "0.0.0",
         type: "module",
         files: ["scripts"],

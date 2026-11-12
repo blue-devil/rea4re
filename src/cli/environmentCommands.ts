@@ -39,6 +39,7 @@ import { withCommandCancellation } from "./commandCancellation.js";
 import { finishAnalysisCommand } from "./finishAnalysisCommand.js";
 import type { CliInstance } from "./types.js";
 import { cliDecimalField } from "./options.js";
+import { PRODUCT_IDENTITY } from "../identity.js";
 
 /** Same envelope label as the other JSON-input commands and `parseCliJsonInput`. */
 const cliError = (error: AnalysisError): JsonValue => ({
@@ -510,7 +511,7 @@ const registerBuildCommand = (
       packageTarball: localPathStringSchema
         .optional()
         .describe(
-          "Packed rea-agents tarball (npm pack) copied into the env folder and installed by the Dockerfile instead of the registry package pinned to this version",
+          `Packed ${PRODUCT_IDENTITY.packageName} tarball (npm pack) copied into the env folder and installed by the Dockerfile instead of the registry package pinned to this version`,
         ),
       dryRun: z
         .boolean()
@@ -642,7 +643,7 @@ const registerExportCommand = (cli: CliInstance, logger: Logger): void => {
       packageTarball: localPathStringSchema
         .optional()
         .describe(
-          "Packed rea-agents tarball (npm pack) copied into the env folder and installed by the Dockerfile instead of the registry package pinned to this version",
+          `Packed ${PRODUCT_IDENTITY.packageName} tarball (npm pack) copied into the env folder and installed by the Dockerfile instead of the registry package pinned to this version`,
         ),
       name: z
         .string()

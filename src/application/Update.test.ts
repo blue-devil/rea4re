@@ -35,7 +35,7 @@ class FakeUpdateHost implements UpdateHost {
   installationResult: UpdateInstallation | undefined = {
     manager: "npm",
     prefix: "/fixture",
-    packageRoot: "/fixture/lib/node_modules/rea-agents",
+    packageRoot: "/fixture/lib/node_modules/rea4re",
   };
   installResult: Result<void, string> = ok(undefined);
   verified: Result<string, string> = ok("3.3.0");
@@ -131,7 +131,7 @@ describe("REA update", () => {
         "--ignore-scripts",
         "--prefix",
         "/fixture",
-        "rea-agents@3.3.0",
+        "rea4re@3.3.0",
       ],
     });
     expect(host.installedVersions).toEqual(["3.3.0"]);
@@ -144,19 +144,13 @@ describe("REA update", () => {
     host.installationResult = {
       manager: "bun",
       globalDirectory: "/home/user/.bun/install/global",
-      packageRoot: "/home/user/.bun/install/global/node_modules/rea-agents",
+      packageRoot: "/home/user/.bun/install/global/node_modules/rea4re",
     };
     expect(await runUpdate("3.2.1", host, "structured")).toMatchObject({
       status: "updated",
       installMethod: "bun",
       installedVersion: "3.3.0",
-      command: [
-        "bun",
-        "add",
-        "--global",
-        "--ignore-scripts",
-        "rea-agents@3.3.0",
-      ],
+      command: ["bun", "add", "--global", "--ignore-scripts", "rea4re@3.3.0"],
     });
     expect(host.verifiedInstallation).toEqual(host.installationResult);
     expect(await runUpdate("3.3.0", host)).toMatchObject({
@@ -360,12 +354,12 @@ describe("update failures and version boundaries", () => {
 
   it("reports actual npm failures and skips verification", async () => {
     const host = new FakeUpdateHost();
-    host.installResult = err("EACCES /fixture/lib/node_modules/rea-agents");
+    host.installResult = err("EACCES /fixture/lib/node_modules/rea4re");
     const result = await runUpdate("3.2.1", host);
     expect(result).toMatchObject({ status: "failed", reason: "install" });
     expect(result).toHaveProperty(
       "remediation",
-      expect.stringContaining("EACCES /fixture/lib/node_modules/rea-agents"),
+      expect.stringContaining("EACCES /fixture/lib/node_modules/rea4re"),
     );
     expect(host.verifiedInstallation).toBeUndefined();
   });
@@ -379,14 +373,14 @@ describe("npm installation ownership", () => {
   });
 
   it("identifies the global prefix and package root", async () => {
-    const packageRoot = "/usr/local/lib/node_modules/rea-agents";
+    const packageRoot = "/usr/local/lib/node_modules/rea4re";
     await expect(
       detectNpmInstallation(packageRoot, host("/usr/local/lib/node_modules")),
     ).resolves.toEqual({ manager: "npm", prefix: "/usr/local", packageRoot });
   });
 
   it("retains the curl installer's custom Unix prefix", async () => {
-    const packageRoot = "/home/user/.local/lib/node_modules/rea-agents";
+    const packageRoot = "/home/user/.local/lib/node_modules/rea4re";
     await expect(
       detectNpmInstallation(packageRoot, host("/usr/local/lib/node_modules")),
     ).resolves.toEqual({
@@ -398,8 +392,8 @@ describe("npm installation ownership", () => {
 
   it.each([
     "/work/rea",
-    "/work/node_modules/rea-agents",
-    "/cache/_npx/abc/node_modules/rea-agents",
+    "/work/node_modules/rea4re",
+    "/cache/_npx/abc/node_modules/rea4re",
   ])("rejects unrelated invocation %s", async (packageRoot) => {
     await expect(
       detectNpmInstallation(packageRoot, host("/usr/local/lib/node_modules")),
@@ -412,17 +406,14 @@ describe("npm installation ownership", () => {
       canonicalPath: (): Promise<string> => Promise.reject(new Error("EACCES")),
     };
     await expect(
-      detectNpmInstallation(
-        "/home/.local/lib/node_modules/rea-agents",
-        failing,
-      ),
+      detectNpmInstallation("/home/.local/lib/node_modules/rea4re", failing),
     ).resolves.toBeUndefined();
   });
 });
 
 describe("Bun installation ownership", () => {
   const globalDirectory = "/home/user/.bun/install/global";
-  const packageRoot = `${globalDirectory}/node_modules/rea-agents`;
+  const packageRoot = `${globalDirectory}/node_modules/rea4re`;
   // Fixture paths are POSIX; join() may produce Windows separators on Windows hosts.
   const host = (
     manifests: readonly string[] = [`${globalDirectory}/package.json`],
@@ -454,12 +445,12 @@ describe("Bun installation ownership", () => {
           "outer",
           "global",
           "node_modules",
-          "rea-agents",
+          "rea4re",
         );
         await mkdir(selectedPackage, { recursive: true });
         await writeFile(`${selected}/package.json`, "{}");
         // The lexical alternative is also a valid project; it must not win.
-        await mkdir(join(directory, "global", "node_modules", "rea-agents"), {
+        await mkdir(join(directory, "global", "node_modules", "rea4re"), {
           recursive: true,
         });
         await writeFile(join(directory, "global", "package.json"), "{}");
@@ -498,9 +489,9 @@ describe("Bun installation ownership", () => {
   });
 
   it.each([
-    "/home/user/project/node_modules/rea-agents",
-    "/usr/local/lib/node_modules/rea-agents",
-    "/home/user/.bun/install/cache/rea-agents@6.4.0@@@1",
+    "/home/user/project/node_modules/rea4re",
+    "/usr/local/lib/node_modules/rea4re",
+    "/home/user/.bun/install/cache/rea4re@6.4.0@@@1",
   ])("rejects package root %s outside the global project", async (root) => {
     await expect(
       detectBunInstallation(root, globalDirectory, host()),

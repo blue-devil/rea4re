@@ -709,8 +709,8 @@ describe("platform-aware client config paths", () => {
 
 describe("client registration command ownership", () => {
   it.skipIf(process.platform === "win32").each([
-    ["rea", "rea-agents"],
-    ["rea-agents", "rea"],
+    ["rea", "rea4re"],
+    ["rea4re", "rea"],
   ])(
     "recognizes %s through its %s launcher alias",
     async (registered, current) => {
@@ -739,9 +739,9 @@ describe("client registration command ownership", () => {
       await writeFile(owned, "// owned\n");
       await writeFile(foreign, "// foreign\n");
       await symlink(owned, join(root, "rea"));
-      await symlink(foreign, join(root, "rea-agents"));
+      await symlink(foreign, join(root, "rea4re"));
       await symlink(join(root, "missing.mjs"), join(root, "missing"));
-      for (const candidate of ["rea-agents", "missing"]) {
+      for (const candidate of ["rea4re", "missing"]) {
         const command = [join(root, candidate), "mcp"];
         expect(
           classifyClientRegistrationCommand(command, join(root, "rea")),
@@ -835,9 +835,9 @@ describe("client launcher traversal semantics", () => {
   );
 
   it("recognizes prior exact REA releases while rejecting foreign package commands", () => {
-    expect(classifyClientRegistrationCommand(["rea", "mcp"], undefined)).toBe(
-      "owned",
-    );
+    expect(
+      classifyClientRegistrationCommand(["rea4re", "mcp"], undefined),
+    ).toBe("owned");
     const cwdMatchingEntry = resolve("./rea");
     expect(
       classifyClientRegistrationCommand(["./rea", "mcp"], cwdMatchingEntry),

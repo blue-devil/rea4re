@@ -30,7 +30,7 @@ describe("environment bundle package pin", () => {
 
   it("pins the registry install to the package.json version", async () => {
     const manifest = z
-      .object({ name: z.literal("rea-agents"), version: z.string().min(1) })
+      .object({ name: z.literal("rea4re"), version: z.string().min(1) })
       .parse(
         JSON.parse(
           await readFile(
@@ -48,6 +48,6 @@ describe("environment bundle package pin", () => {
       true,
     );
     expect(PRODUCT_IDENTITY.packageVersion).toBe(manifest.version);
-    expect(dockerfile).not.toMatch(/rea-agents@(?:latest|\^|~)/u);
+    expect(dockerfile).not.toMatch(/rea4re@(?:latest|\^|~)/u);
   });
 });

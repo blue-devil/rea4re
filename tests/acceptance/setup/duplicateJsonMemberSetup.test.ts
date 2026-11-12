@@ -22,7 +22,7 @@ const assertSelectedLauncher = async (value: unknown) => {
 const shadowParent = '"mcpServers": {"shadow": {"command": "/usr/bin/false"}},';
 const shadowLeaf = '"rea": {"command": "/usr/bin/false"},';
 const owned =
-  '"rea": {"command": "npx", "args": ["-y", "rea-agents@6.6.0", "mcp"]}';
+  '"rea": {"command": "npx", "args": ["-y", "rea4re@6.6.0", "mcp"]}';
 
 const runIn = (cli: TestCli, home: string) => (arguments_: readonly string[]) =>
   cli.run({
@@ -40,7 +40,7 @@ const setupArguments = (client: string) =>
   ["setup", "--client", client, "--skill=false", "--json", "--yes"] as const;
 
 const openCodeOwned =
-  '{"type":"local","command":["npx","-y","rea-agents@6.6.0","mcp"]}';
+  '{"type":"local","command":["npx","-y","rea4re@6.6.0","mcp"]}';
 const openCodeForeign = '{"type":"local","command":["/usr/bin/false"]}';
 
 const writeConfiguration = async (path: string, text: string) => {
@@ -176,7 +176,7 @@ cliTest(
     const home = await createTestTempDirectory("rea-json-owned-repeats-");
     const config = join(home, ".claude.json");
     const inactive = '{"inactivePeer":{"command":"/usr/bin/false"}}';
-    const active = `{"rea":{"command":"npx","args":["-y","rea-agents@6.6.0","mcp"]},"peer":{"command":"/usr/bin/true"},"rea":{"command":"npx","args":["-y","rea-agents@6.5.0","mcp"]}}`;
+    const active = `{"rea":{"command":"npx","args":["-y","rea4re@6.6.0","mcp"]},"peer":{"command":"/usr/bin/true"},"rea":{"command":"npx","args":["-y","rea4re@6.5.0","mcp"]}}`;
     const original = `{"mcpServers":${inactive},"mcpServers":${active}}\n`;
     await writeFile(config, original);
 
@@ -195,7 +195,7 @@ cliTest(
     });
     expect(afterRemoval).toContain(`"mcpServers":${inactive}`);
     expect(afterRemoval).toContain('"peer":{"command":"/usr/bin/true"}');
-    expect(afterRemoval).not.toContain("rea-agents@");
+    expect(afterRemoval).not.toContain("rea4re@");
     expect(await readFile(`${config}.rea.backup`, "utf8")).toBe(original);
 
     const repeated = await run(["uninstall", "--json"]);

@@ -8,7 +8,7 @@
       "name": "rea",
       "source": {
         "source": "npm",
-        "package": "rea-agents",
+        "package": "rea4re",
         "version": "6.8.0"
       },
       "policy": {

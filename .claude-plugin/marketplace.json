@@ -12,7 +12,7 @@
       "description": "Reverse engineer anything with agents, from app behavior down to native binaries.",
       "source": {
         "source": "npm",
-        "package": "rea-agents",
+        "package": "rea4re",
         "version": "6.8.0"
       },
       "category": "development"
