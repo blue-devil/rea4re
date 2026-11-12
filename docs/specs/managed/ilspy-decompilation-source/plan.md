@@ -113,9 +113,9 @@
 **Interfaces:**
 
 - Consumes: `ManagedMemberInspection` (from `src/dotnet/` inspection), `IlspyToolText`, output kind.
-- Produces: `buildIlspyReconstructionRequest(inspection, selections: { token, text, kind }[]): { request: ManagedReconstructionImportRequest, excluded: [{ token, declaring_type, name, reason }] }` — `signature_sha256`/`normalized_il_sha256` sourced only from inspection rows matched by token; excluded members carry `missing_normalized_il | empty_text | truncated_text | unknown_token`; `request.methods` empty → caller refuses before import.
+- Produces: `buildIlspyReconstructionRequest(inspection, selections: { token, text, kind }[]): { request: ManagedReconstructionImportRequest, excluded: [{ token, declaring_type, name, reason }] }` — `signature_sha256`/`normalized_il_sha256` sourced only from inspection rows matched by token; excluded members carry `missing_normalized_il | empty_text | truncated_text | unknown_token | ambiguous_member_name | token_mismatch`; `request.methods` empty → caller refuses before import.
 
-- [ ] **Step 1: Failing tests** — happy join produces per-method lock values from inspection rows; upstream text attached to wrong token in the caller's selection is impossible by construction (selection carries token, join reads lock values from inspection by that token); empty/truncated text excluded with reason; zero joinable members yields empty `methods` and refusal upstream; at least one joinable → request valid per `managedReconstructionImportInputSchema`.
+- [ ] **Step 1: Failing tests** — happy join produces per-method lock values from inspection rows; upstream text attached to wrong token in the caller's selection is impossible by construction (selection carries token, join reads lock values from inspection by that token); empty/truncated text excluded with reason; zero joinable members yields empty `methods` and refusal upstream; at least one joinable → request valid per `managedReconstructionImportInputSchema`; two inspection members sharing a method name are both excluded with `ambiguous_member_name` before any upstream call; `decompiled-il` selections whose `showTokens` response lacks the member's token are excluded with `token_mismatch`.
 - [ ] **Step 2:** FAIL. **Step 3:** implement pure joiner. **Step 4:** PASS. Commit `feat(ilspy): join ilspy text with managed member evidence`.
 
 ### Task 6: Managed contract entry + result schema
@@ -199,7 +199,7 @@
 
 **Interfaces:** Consumes Task 7 with a real config pointing at the pinned release binary.
 
-- [ ] **Step 1:** fixture module records provenance: ILSpy-MCP release tag, archive SHA-256, fixture DLL origin + SHA-256 (fixture DLL shipped inside the release archive, e.g. `ICSharpCode.Decompiler.dll`; refuse to run when digests mismatch).
+- [ ] **Step 1:** fixture module records provenance: ILSpy-MCP release tag, archive SHA-256, fixture DLL origin + SHA-256 (fixture DLL shipped inside the release archive, e.g. `ICSharpCode.Decompiler.dll`; refuse to run when digests mismatch). Provisioning follows the repo's BYO convention: both binary and fixture arrive via `REA_ILSPY_MCP_TEST_BIN` / `REA_ILSPY_MCP_TEST_FIXTURE` env paths; nothing downloads in CI, no binaries are committed, tests skip cleanly when unset.
 - [ ] **Step 2:** verification script: download pinned archive, verify digest, extract, run the boundary test suite (decompile a known type of the fixture DLL, assert lock join + reconstruction id + excluded-member path via a deliberately mismatched member name).
 - [ ] **Step 3:** `PATH="/usr/local/bin:$PATH" npm run test:local -- tests/boundary/providers/ilspy/` with env unset — SKIPPED cleanly (document skip reason).
 - [ ] **Step 4:** run script with env set; record output in spec `verification.md`. Commit `test(ilspy): real-provider verification lane`.

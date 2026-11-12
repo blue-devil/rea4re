@@ -38,10 +38,12 @@ changes.
   loopback. Same shape and redaction rules as `REA_IDA_MCP_CONFIG`
   (`src/ida/IdaConfiguration.ts`). Sensitive values are redacted by the
   existing diagnostics redactor, never inferred from names.
-- Lifecycle: REA spawns the configured stdio server once per analysis
-  session, reuses the connection for every tool call, and closes it at
-  session end. Close failures keep ownership and are reported as incomplete
-  cleanup, following the shared `AnalysisClient` close contract.
+- Lifecycle: REA spawns the configured stdio server once per
+  `decompile_managed_members` operation (the managed lane is stateless, so
+  an operation is the session unit), reuses the connection for every tool
+  call, and closes it before the operation returns. Close failures keep
+  ownership and are reported as incomplete cleanup, following the shared
+  `AnalysisClient` close contract.
 - Catalog admission: before the first analysis call, REA reads the live
   `tools/list` catalog and requires exactly the tools this workflow drives
   (`decompile_method`, `disassemble_method`, and the inventory tools the
@@ -49,6 +51,25 @@ changes.
   names in the error. No version string is treated as a compatibility
   guarantee; the live catalog is the only check. The server's declared
   version is recorded in Evidence as an observation, not a contract.
+- Transport scope: an accepted loopback HTTP registration validates but is
+  refused at operation time with a typed `unsupported_transport` error in
+  phase one; doctor reports the registration healthy and names the refusal.
+- Member selection: phase one admits members whose method name is unique
+  within the declaring type, because upstream selects only by
+  `assemblyPath`/`typeName`/`methodName`. Same-name members (overloads,
+  multiple constructors) are excluded with reason `ambiguous_member_name`,
+  and the result limitations name the excluded count and the
+  `import_managed_reconstruction` fallback for them.
+- Text binding: the `decompiled-il` output kind runs `disassemble_method`
+  with `showTokens: true` and verifies the member's metadata token appears
+  in the response before joining; a token mismatch excludes the member with
+  `token_mismatch`. The `decompiled-csharp` kind trusts upstream's
+  name-based selection, and the result states this trust model in its
+  limitations.
+- Text admission: truncated upstream text is never admitted. A member whose
+  response carries `truncated: true` is excluded with `truncated_text`; the
+  raw text still appears in that member's diagnostic for the caller's own
+  import fallback.
 - The workflow operation `decompile_managed_members` takes: the assembly
   path, a member selection (one declaring type, optionally narrowed to
   member names), and an output kind (`decompiled-csharp`, default, or
@@ -59,7 +80,8 @@ changes.
   (missing normalized IL, text empty after the upstream truncation footer)
   are reported per member and never silently dropped; the import admits the
   joinable subset only when at least one method joins, and the result
-  limitations name the excluded members and reasons.
+  limitations name the excluded members and reasons. Truncated responses
+  are never admitted; see the text-admission requirement below.
 - A member whose upstream text cannot be parsed into the reconstruction
   record still surfaces the raw text in the per-member diagnostic, so a
   caller can fall back to `import_managed_reconstruction` with their own
