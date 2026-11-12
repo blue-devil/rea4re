@@ -1,5 +1,6 @@
 import { statSync } from "node:fs";
 import * as nodeModule from "node:module";
+import { transformSync } from "esbuild";
 import { extname, isAbsolute, relative, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -95,11 +96,14 @@ const loadSource = (url, context, nextLoad) => {
   return {
     ...loaded,
     format,
-    source: nodeModule.stripTypeScriptTypes(source, {
-      mode: "transform",
-      sourceMap: true,
-      sourceUrl: url,
-    }),
+    // esbuild instead of node stripTypeScriptTypes: strip-only mode rejects
+    // parameter properties, and node >=26.13 removed transform mode entirely.
+    source: transformSync(source, {
+      loader: "ts",
+      format: format === "module" ? "esm" : "cjs",
+      sourcemap: "inline",
+      sourcefile: url,
+    }).code,
   };
 };
 
@@ -109,10 +113,7 @@ const loadSource = (url, context, nextLoad) => {
  * graph across owners. No transformed output is cached across Node versions.
  */
 export const importVerifierSource = async (url, parent) => {
-  if (
-    typeof nodeModule.registerHooks !== "function" ||
-    typeof nodeModule.stripTypeScriptTypes !== "function"
-  )
+  if (typeof nodeModule.registerHooks !== "function")
     throw new Error(
       "This REA source loader requires the Node.js version pinned in .nvmrc; run nvm use and invoke source build and verifier scripts with node and npm. Installed REA packages have separate runtime support.",
     );
