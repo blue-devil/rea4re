@@ -157,6 +157,9 @@ export const parseConfig = (
     ...(env.REA_IDA_MCP_CONFIG === undefined
       ? {}
       : { idaMcpConfigPath: env.REA_IDA_MCP_CONFIG }),
+    ...(env.REA_ILSPY_MCP_CONFIG === undefined
+      ? {}
+      : { ilspyMcpConfigPath: env.REA_ILSPY_MCP_CONFIG }),
     ...(env.REA_GHIDRA_PROJECT_PATH === undefined
       ? {}
       : {
