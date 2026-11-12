@@ -5,6 +5,7 @@ import type { ToolContract } from "../toolContractTypes.js";
 import { managedOutputSchemas } from "../toolOutputSchemaGroups.js";
 import { toolContractMetadata } from "../toolEffects.js";
 import { absoluteLocalPathStringSchema } from "../../domain/localPath.js";
+import { managedDecompilationInputSchema } from "../../domain/managed/managedDecompilation.js";
 import { analysisDetailSchema } from "../analysisDetail.js";
 import { managedInspectionBudgetShape } from "../../domain/managed/managedInspectionLimits.js";
 
@@ -124,6 +125,37 @@ export const MANAGED_TOOL_CONTRACTS = [
       {
         title: "Example inspect managed/native boundary request",
         input: {},
+      },
+    ],
+  },
+  {
+    name: "decompile_managed_members",
+    retainedSummary: { evidenceParameters: "omit-detail" },
+    ...toolContractMetadata("decompile_managed_members"),
+    description:
+      "Decompile selected managed members to decompiled-csharp or decompiled-il text through a BYO ILSpy-MCP server, lock each method against REA's own member inventory (exact artifact SHA-256, token, signature and normalized-IL hashes), and return reconstruction Evidence; same-name members are refused as ambiguous, excluded members report a reason, and a joined import is returned as reconstruction. Decompiler text stays analyst inference; metadata and IL observations remain canonical.",
+    kind: "managed-provider",
+    inputSchema: managedDecompilationInputSchema,
+    outputSchema: requireOutputSchema(
+      managedOutputSchemas,
+      "decompile_managed_members",
+    ),
+    examples: [
+      {
+        title: "Example decompile managed members request",
+        input: {
+          assembly_path: "/tmp/Example.dll",
+          declaring_type: "Example.Program",
+        },
+      },
+      {
+        title: "Decompile selected members as IL",
+        input: {
+          assembly_path: "/tmp/mscorlib.dll",
+          declaring_type: "System.Threading.Monitor",
+          member_names: ["Enter"],
+          output_kind: "decompiled-il",
+        },
       },
     ],
   },
