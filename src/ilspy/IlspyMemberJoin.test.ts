@@ -190,6 +190,9 @@ describe("buildIlspyReconstructionRequest", () => {
     ]);
   });
 
+});
+
+describe("buildIlspyReconstructionRequest exclusions and batches", () => {
   it("excludes empty or whitespace-only text", () => {
     const { excluded } = buildIlspyReconstructionRequest(inspection, [
       csharp("0x06000001", ""),
