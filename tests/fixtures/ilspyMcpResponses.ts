@@ -31,3 +31,21 @@ export const TWO_FOOTER_RESPONSE = `Match 1: "alpha" in A.Method
 [pagination:{total:1,returned:1,truncated:false,offset:0}]
 [pagination:{total:3,returned:3,truncated:false,offset:0}]
 `;
+
+/**
+ * Verbatim trailing footer recorded from a real ILSpy.Mcp v1.2.1 server
+ * (linux-arm64 release build), decompile_method on Newtonsoft.Json 13.0.3,
+ * recorded 2026-11-13. The footer is a quoted-JSON object and carries the
+ * extra nextOffset key.
+ */
+export const REAL_V121_JSON_FOOTER_RESPONSE = `private static string SerializeObjectInternal(object? value)
+{
+    return value;
+}
+[pagination:{"total":842,"returned":842,"offset":0,"truncated":false,"nextOffset":null}]
+`;
+
+/** The v1.2.1 footer shape with truncation live. */
+export const REAL_V121_JSON_FOOTER_TRUNCATED_RESPONSE = `Match 1: "alpha" in A.Method
+[pagination:{"total":900,"returned":100,"offset":0,"truncated":true,"nextOffset":100}]
+`;

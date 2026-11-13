@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   DECOMPILE_METHOD_RESPONSE,
   MALFORMED_FOOTER_RESPONSE,
+  REAL_V121_JSON_FOOTER_RESPONSE,
+  REAL_V121_JSON_FOOTER_TRUNCATED_RESPONSE,
   SEARCH_STRINGS_RESPONSE,
   TWO_FOOTER_RESPONSE,
 } from "../../tests/fixtures/ilspyMcpResponses.js";
@@ -89,5 +91,51 @@ describe("parseIlspyToolText", () => {
       truncated: false,
       offset: 0,
     });
+  });
+
+  it("parses the recorded ILSpy.Mcp v1.2.1 quoted-JSON footer", () => {
+    const parsed = parseIlspyToolText(REAL_V121_JSON_FOOTER_RESPONSE);
+    if (!parsed.ok) throw parsed.error;
+    expect(parsed.value.pagination).toEqual({
+      total: 842,
+      returned: 842,
+      truncated: false,
+      offset: 0,
+    });
+    expect(parsed.value.body).toBe(
+      REAL_V121_JSON_FOOTER_RESPONSE.slice(
+        0,
+        REAL_V121_JSON_FOOTER_RESPONSE.lastIndexOf("[pagination:"),
+      ).replace(/\r?\n$/, ""),
+    );
+    expect(parsed.value.trailingFooters).toEqual([]);
+  });
+
+  it("preserves truncated:true from the v1.2.1 quoted-JSON footer", () => {
+    const parsed = parseIlspyToolText(REAL_V121_JSON_FOOTER_TRUNCATED_RESPONSE);
+    if (!parsed.ok) throw parsed.error;
+    expect(parsed.value.pagination).toEqual({
+      total: 900,
+      returned: 100,
+      truncated: true,
+      offset: 0,
+    });
+    expect(parsed.value.body).toBe('Match 1: "alpha" in A.Method');
+  });
+
+  it("fails closed on a quoted-JSON footer with a wrong value type", () => {
+    const parsed = parseIlspyToolText(
+      'body\n[pagination:{"total":"842","returned":1,"offset":0,"truncated":false}]',
+    );
+    expect(parsed.ok).toBe(false);
+    if (parsed.ok) throw new Error("expected failure");
+    expect(parsed.error.constraint).toContain('"total":"842"');
+  });
+
+  it("fails closed on a quoted-JSON footer with invalid JSON", () => {
+    const parsed = parseIlspyToolText("body\n[pagination:{total:842,}]");
+    expect(parsed.ok).toBe(false);
+    if (parsed.ok) throw new Error("expected failure");
+    expect(parsed.error.constraint).toContain("[pagination:{total:842,}]");
   });
 });
