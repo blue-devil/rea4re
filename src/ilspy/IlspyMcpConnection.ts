@@ -8,6 +8,7 @@ import {
   DEFAULT_INHERITED_ENV_VARS,
   StdioClientTransport,
 } from "@modelcontextprotocol/client/stdio";
+import type { Stream } from "node:stream";
 import { ChildProcess } from "node:child_process";
 import { Socket } from "node:net";
 import {
@@ -20,6 +21,10 @@ import {
   type IlspyMcpRegistration,
 } from "./IlspyMcpConfiguration.js";
 import { snapshotEnvironment } from "../process/snapshotEnvironment.js";
+/** Drain piped child stderr so server logs cannot backpressure-block the child. */
+export const drainIlspyStderr = (stream: Stream | null | undefined): void => {
+  stream?.on("data", () => {});
+};
 
 /** Largest admitted stdio reply; the SDK default would fail large decompile bodies. */
 const ILSPY_STDIO_MAX_MESSAGE_BYTES = 64 * 1024 * 1024;
@@ -89,6 +94,8 @@ export const createIlspyMcpConnection = (
   return {
     async connect() {
       await client.connect(transport, { timeout: timeoutMs });
+      // The piped stderr PassThrough is otherwise unread and blocks the child.
+      drainIlspyStderr(transport.stderr);
       const catalog = await client.listTools(undefined, { timeout: timeoutMs });
       return catalog.tools.map(({ name }) => name);
     },
