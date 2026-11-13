@@ -2,10 +2,11 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 
 /**
- * Pinned ILSpy-MCP release provenance. The v1.2.1 archives are self-contained
- * native publishes and ship no managed DLL, so the lane regenerates the
- * fixture instead of extracting one; nothing here downloads or commits bytes.
- * Kept free of repo imports and TS-only syntax so plain Node can load it.
+ * Pinned ILSpy-MCP release provenance. The archives are self-contained
+ * native publishes (no managed DLL inside), so the decompilation fixture
+ * comes from the pinned NuGet package below; nothing here downloads or
+ * commits bytes. Kept free of repo imports and TS-only syntax so plain Node
+ * (type stripping) can load it from the operator script.
  */
 export const ILSpyMcpRelease = {
   repository: "cervonwong/ILSpy-MCP",
@@ -17,15 +18,18 @@ export const ILSpyMcpRelease = {
 } as const;
 
 /**
- * Pinned real-provider fixture: the deterministic synthetic managed PE built
- * by `buildManagedPeFixture()` defaults (`Fixture.Program.Main`). Regenerate
- * with `node scripts/verify-real-ilspy-mcp.mjs --generate-fixture <path>`.
+ * Pinned real managed assembly fixture: Newtonsoft.Json 13.0.3 from NuGet
+ * (MIT). Fetch the package URL below, `unzip -p` the in-package DLL path to
+ * an absolute location, and point REA_ILSPY_MCP_TEST_FIXTURE at it.
  */
 export const ManagedTestFixture = {
-  origin: "src/dotnet/ManagedPe.fixture.ts buildManagedPeFixture() defaults",
-  declaringType: "Fixture.Program",
-  memberName: "Main",
-  sha256: "c96cd66659210492a76543a1760925838463c48b626c71ad6a560bfa699b2f63",
+  packageId: "Newtonsoft.Json",
+  packageVersion: "13.0.3",
+  packageUrl: "https://www.nuget.org/api/v2/package/Newtonsoft.Json/13.0.3",
+  inPackagePath: "lib/net6.0/Newtonsoft.Json.dll",
+  declaringType: "Newtonsoft.Json.JsonConvert",
+  memberName: "SerializeObjectInternal",
+  sha256: "22c649f75fce5be7c7ccda8880473b634ef69ecf33f5d1ab8ad892caf47d5a07",
 } as const;
 
 /** Typed refusal: the file at `path` is not the pinned fixture assembly. */
@@ -36,7 +40,7 @@ export class ManagedAssemblyProvenanceError extends Error {
 
   constructor(path: string, expectedSha256: string, actualSha256: string) {
     super(
-      `Managed assembly provenance mismatch for ${path}: expected sha256 ${expectedSha256}, observed ${actualSha256}. Regenerate the pinned fixture with "node scripts/verify-real-ilspy-mcp.mjs --generate-fixture <path>".`,
+      `Managed assembly provenance mismatch for ${path}: expected sha256 ${expectedSha256} (the pinned ${ManagedTestFixture.packageId} ${ManagedTestFixture.packageVersion} DLL at ${ManagedTestFixture.inPackagePath} inside ${ManagedTestFixture.packageUrl}), observed ${actualSha256}.`,
     );
     this.name = "ManagedAssemblyProvenanceError";
     this.path = path;

@@ -45,6 +45,7 @@ describe("real ILSpy MCP provider (requires REA_ILSPY_MCP_TEST_BIN and REA_ILSPY
           {
             assembly_path: fixturePath!,
             declaring_type: ManagedTestFixture.declaringType,
+            member_names: [ManagedTestFixture.memberName],
           },
           {},
         );
@@ -85,7 +86,7 @@ describe("real ILSpy MCP provider (requires REA_ILSPY_MCP_TEST_BIN and REA_ILSPY
         expect(executed).toMatchObject({
           ok: false,
           error: {
-            message: expect.stringContaining("NoSuchRealMember"),
+            userMessage: expect.stringContaining("NoSuchRealMember"),
           },
         });
       } finally {
