@@ -274,6 +274,68 @@ it("compares observed call-target names through the managed MCP contract", async
   ).toContainEqual(expect.objectContaining({ status: "unchanged" }));
 });
 
+it("exposes decompile_managed_members with launch-process effects, path admission, and the fail-closed route", async () => {
+  const directory = await createTestTempDirectory("rea-managed-decompile-");
+  const path = join(directory, "fixture.dll");
+  await writeFile(path, buildManagedPeFixture());
+  const session = composeBinarySession(new AnalysisProviderRegistry([]), [
+    new ManagedStaticProvider(),
+  ]);
+  const { client } = await createApplicationMcpHarness({
+    session,
+    clientIdentity: { name: "managed-decompile-mcp", version: "1.0.0" },
+  });
+  // The managed MCP surface resolves the target from the inspected selection.
+  await client.callTool({
+    name: "inspect_managed_artifact",
+    arguments: { path },
+  });
+  const advertised = (await client.listTools()).tools.find(
+    (tool) => tool.name === "decompile_managed_members",
+  );
+  if (advertised === undefined)
+    throw new Error("decompile_managed_members is missing from tools/list");
+  expect(advertised.inputSchema).toMatchObject({ additionalProperties: false });
+  const contract = toolContract("decompile_managed_members");
+  expect(advertised.annotations).toMatchObject(contract.annotations);
+  // The launch-process effect marker is the open-world annotation.
+  expect(advertised.annotations).toMatchObject({
+    readOnlyHint: false,
+    openWorldHint: true,
+  });
+  const relative = parseMcpToolError(
+    await client.callTool({
+      name: "decompile_managed_members",
+      arguments: {
+        assembly_path: "fixture.dll",
+        declaring_type: "Fixture.Program",
+      },
+    }),
+  );
+  expect(relative.error).toMatchObject({
+    code: "invalid_request",
+    details: {
+      issues: [expect.objectContaining({ path: ["assembly_path"] })],
+    },
+  });
+  const unconfigured = parseMcpToolError(
+    await client.callTool({
+      name: "decompile_managed_members",
+      arguments: {
+        assembly_path: path,
+        declaring_type: "Fixture.Program",
+      },
+    }),
+  );
+  expect(unconfigured.error).toMatchObject({
+    code: "configuration_invalid",
+    message: expect.stringContaining("REA_ILSPY_MCP_CONFIG"),
+    details: {
+      settings: [expect.objectContaining({ setting: "REA_ILSPY_MCP_CONFIG" })],
+    },
+  });
+}, 30_000);
+
 it("opens a managed PE and executes the managed static provider through MCP", async () => {
   const directory = await createTestTempDirectory("rea-managed-mcp-");
   const path = join(directory, "fixture.exe");
