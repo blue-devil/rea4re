@@ -139,6 +139,7 @@ export const CLI_COMMANDS = Object.freeze({
   openJebProject: "open-jeb-project",
   listJebUnits: "list-jeb-units",
   decompileJebItem: "decompile-jeb-item",
+  decompileManagedMembers: "decompile-managed-members",
   inspectManagedMembers: "inspect-managed-members",
   inspectManagedNativeBoundaries: "inspect-managed-native-boundaries",
   compareManagedMembers: "compare-managed-members",

@@ -209,7 +209,12 @@ export const createCli = (
       registerArtifactCommands(cli, logger, analysis.runProviderAnalysis);
     },
     managed: () =>
-      registerManagedCommands(cli, logger, analysis.runProviderAnalysis),
+      registerManagedCommands(
+        cli,
+        logger,
+        analysis.runProviderAnalysis,
+        environment,
+      ),
     firmware: () => registerFirmwareCommands(cli, logger, environment),
     android: () => registerAndroidCommands(cli, logger, environment),
     pcap: () => registerPcapCommands(cli, logger, environment),
