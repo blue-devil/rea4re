@@ -81,7 +81,7 @@ contract.
 Pillar 1 is decompilation-first analysis, worked here by managed .NET: REA
 decompiles selected members against its own metadata inventory and returns
 hash-locked reconstruction Evidence with
-`rea4re decompile-managed-members /absolute/path/Assembly.dll --type Namespace.Type --json`.
+`rea4re decompile-managed-members /absolute/path/Assembly.dll Namespace.Type --json`.
 See `docs/providers/ilspy-mcp.md` for the ILSpy-MCP guide. The later pillars
 are upcoming, one spec each: pillar 2, workflow comprehension — a lane-neutral
 machine-readable comprehension record written from decompilation; pillar 3,
