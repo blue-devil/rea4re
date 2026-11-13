@@ -14,7 +14,7 @@ class FakeIlspyConnection {
   connectCalls = 0;
   calls: readonly (readonly [string, unknown])[] = [];
   connectError: Error | undefined;
-  closeError: Error | undefined;
+  callError: Error | undefined;
   childAlive = false;
   serverInfoValue: JsonValue = { version: "1.2.3-test" };
   async connect(): Promise<readonly string[]> {
@@ -25,6 +25,7 @@ class FakeIlspyConnection {
   }
   async call(name: string, args: unknown): Promise<JsonValue> {
     this.calls.push([name, args]);
+    if (this.callError !== undefined) throw this.callError;
     return { name };
   }
   serverInfo(): JsonValue {
@@ -143,6 +144,30 @@ describe("IlspyMcpSessionClient", () => {
     expect(caught).toBeInstanceOf(IlspyCleanupError);
     const failure = caught as IlspyCleanupError;
     expect(failure.cleanupResources?.[0]).toContain("ILSpy MCP");
+  });
+
+  it("retries close after a failed termination attempt once the failure clears", async () => {
+    const fake = new FakeIlspyConnection();
+    fake.closeError = new Error("child refused termination");
+    const { client } = session(fake);
+    await client.open();
+    await expect(client.close()).rejects.toBeInstanceOf(IlspyCleanupError);
+    expect(fake.childAlive).toBe(true);
+    fake.closeError = undefined;
+    await client.close();
+    expect(fake.childAlive).toBe(false);
+    await expect(client.close()).resolves.toBeUndefined();
+  });
+
+  it("returns a typed err when the upstream call fails instead of rejecting", async () => {
+    const fake = new FakeIlspyConnection();
+    fake.callError = new Error("transport reset");
+    const { client } = session(fake);
+    await client.open();
+    const result = await client.callTool("decompile_method", {});
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("expected call failure");
+    expect(result.error.message).toContain("decompile_method");
   });
 
   it("refuses to construct a connection for an http registration in phase one", () => {

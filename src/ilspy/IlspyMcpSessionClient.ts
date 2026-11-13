@@ -39,8 +39,9 @@ export class IlspyStartupError extends ProviderAdapterError {
 
 /** callTool() was refused before any upstream request was sent. */
 export class IlspyCallError extends ProviderAdapterError {
-  constructor(message: string, registration: string) {
+  constructor(message: string, registration: string, cause?: unknown) {
     super("ilspy", "call", {
+      ...(cause === undefined ? {} : { cause }),
       diagnostics: { reason: message, registration },
     });
     this.message = message;
@@ -70,6 +71,7 @@ export class IlspyCleanupError extends ProviderCleanupError {
 /** Serial session over one spawned ILSpy-MCP stdio child, catalog-admitted at open. */
 export class IlspyMcpSessionClient {
   #tail: Promise<unknown> = Promise.resolve();
+  #closeAttempt: Promise<void> | undefined;
   #openPromise:
     | Promise<
         Result<
@@ -159,22 +161,42 @@ export class IlspyMcpSessionClient {
           this.registrationSummary,
         ),
       );
-    return ok(
-      await this.connection.call(
-        name,
-        args as Readonly<Record<string, JsonValue>>,
-      ),
-    );
+    try {
+      return ok(
+        await this.connection.call(
+          name,
+          args as Readonly<Record<string, JsonValue>>,
+        ),
+      );
+    } catch (cause: unknown) {
+      return err(
+        new IlspyCallError(
+          `ILSpy MCP tool ${name} failed upstream; no result was admitted.`,
+          this.registrationSummary,
+          cause,
+        ),
+      );
+    }
   }
 
-  /** Terminate the spawned child and verify; a second close is a no-op. */
-  async close(): Promise<void> {
-    if (this.#closed) return;
-    this.#closed = true;
+  /**
+   * Terminate the spawned child and verify. A failed attempt keeps ownership
+   * and stays retryable; a verified close makes later calls a no-op.
+   */
+  close(): Promise<void> {
+    if (this.#closed) return Promise.resolve();
+    this.#closeAttempt ??= this.#closeOnce();
+    return this.#closeAttempt;
+  }
+
+  async #closeOnce(): Promise<void> {
+    // Drain in-flight calls so close never kills the transport mid-call.
+    await this.#tail;
     try {
       await this.connection.close();
     } catch (cause: unknown) {
-      // Retain ownership: unref so the surviving child cannot hold the host open.
+      // Retry stays possible; unref so the surviving child cannot hold the host open.
+      this.#closeAttempt = undefined;
       this.connection.detach();
       throw new IlspyCleanupError(
         ["ILSpy MCP stdio child process (termination unverified)"],
@@ -182,5 +204,6 @@ export class IlspyMcpSessionClient {
         this.registrationSummary,
       );
     }
+    this.#closed = true;
   }
 }

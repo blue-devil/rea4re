@@ -19,6 +19,10 @@ import {
   ilspyConfigurationError,
   type IlspyMcpRegistration,
 } from "./IlspyMcpConfiguration.js";
+import { snapshotEnvironment } from "../process/snapshotEnvironment.js";
+
+/** Largest admitted stdio reply; the SDK default would fail large decompile bodies. */
+const ILSPY_STDIO_MAX_MESSAGE_BYTES = 64 * 1024 * 1024;
 
 /** Injectable MCP boundary for the ILSpy provider and its tests. */
 export interface IlspyMcpConnection {
@@ -31,7 +35,6 @@ export interface IlspyMcpConnection {
       readonly signal?: AbortSignal | undefined;
     },
   ): Promise<JsonValue>;
-  serverInfo(): JsonValue;
   close(): Promise<void>;
   /** Unref the retained child after failed cleanup so it cannot hold the host open. */
   detach(): void;
@@ -56,7 +59,7 @@ const decodeIlspyToolResult = (input: unknown): JsonValue => {
 export const createIlspyMcpConnection = (
   registration: IlspyMcpRegistration,
   timeoutMs: number,
-  environment: Readonly<Record<string, string | undefined>> = {},
+  environment: Readonly<NodeJS.ProcessEnv>,
 ): IlspyMcpConnection => {
   if (!("command" in registration))
     throw ilspyConfigurationError(
@@ -73,12 +76,13 @@ export const createIlspyMcpConnection = (
       // The SDK always merges ambient defaults; empty values suppress them.
       ...Object.fromEntries(DEFAULT_INHERITED_ENV_VARS.map((key) => [key, ""])),
       ...Object.fromEntries(
-        Object.entries(environment).filter(
+        Object.entries(snapshotEnvironment(environment)).filter(
           (entry): entry is [string, string] => entry[1] !== undefined,
         ),
       ),
       ...registration.env,
     },
+    maxBufferSize: ILSPY_STDIO_MAX_MESSAGE_BYTES,
     stderr: "pipe",
   });
   return {
