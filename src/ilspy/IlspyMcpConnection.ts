@@ -35,6 +35,7 @@ export interface IlspyMcpConnection {
       readonly signal?: AbortSignal | undefined;
     },
   ): Promise<JsonValue>;
+  serverInfo(): JsonValue;
   close(): Promise<void>;
   /** Unref the retained child after failed cleanup so it cannot hold the host open. */
   detach(): void;
