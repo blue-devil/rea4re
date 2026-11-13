@@ -57,6 +57,11 @@ if (!verified.ok) {
   console.error(verified.error.message);
   process.exit(1);
 }
+const serverBinary = await provenance.verifyIlspyServerBinaryProvenance(bin);
+if (!serverBinary.ok) {
+  console.error(serverBinary.error.message);
+  process.exit(1);
+}
 
 try {
   const { stdout } = await exec(

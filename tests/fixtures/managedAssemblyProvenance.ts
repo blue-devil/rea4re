@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
+import { basename } from "node:path";
 
 /**
  * Pinned ILSpy-MCP release provenance. The archives are self-contained
@@ -67,6 +68,50 @@ export const verifyManagedAssemblyProvenance = async (
         error: new ManagedAssemblyProvenanceError(
           path,
           ManagedTestFixture.sha256,
+          actualSha256,
+        ),
+      };
+};
+
+/** Typed refusal: the BYO file claims the pinned asset name but is not that asset. */
+export class IlspyServerBinaryProvenanceError extends Error {
+  readonly path: string;
+  readonly expectedSha256: string;
+  readonly actualSha256: string;
+
+  constructor(path: string, expectedSha256: string, actualSha256: string) {
+    super(
+      `ILSpy-MCP server binary provenance mismatch for ${path}: expected sha256 ${expectedSha256} (the pinned release asset ${ILSpyMcpRelease.asset} from ${ILSpyMcpRelease.releaseUrl}), observed ${actualSha256}.`,
+    );
+    this.name = "IlspyServerBinaryProvenanceError";
+    this.path = path;
+    this.expectedSha256 = expectedSha256;
+    this.actualSha256 = actualSha256;
+  }
+}
+
+export type IlspyServerBinaryProvenance =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly error: IlspyServerBinaryProvenanceError };
+
+/**
+ * Hash the BYO server binary only when its filename claims the pinned asset
+ * name; an extracted executable is not comparable to the archive digest.
+ */
+export const verifyIlspyServerBinaryProvenance = async (
+  path: string,
+): Promise<IlspyServerBinaryProvenance> => {
+  if (basename(path) !== ILSpyMcpRelease.asset) return { ok: true };
+  const actualSha256 = createHash("sha256")
+    .update(await readFile(path))
+    .digest("hex");
+  return actualSha256 === ILSpyMcpRelease.assetSha256
+    ? { ok: true }
+    : {
+        ok: false,
+        error: new IlspyServerBinaryProvenanceError(
+          path,
+          ILSpyMcpRelease.assetSha256,
           actualSha256,
         ),
       };
