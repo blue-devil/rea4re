@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, it } from "vitest";
 import {
+  createIlspyMcpHealthProbe,
   ILSPY_MCP_DOCTOR_SETTINGS,
   inspectIlspyMcpRegistration,
 } from "./IlspyDoctor.js";
@@ -140,4 +141,83 @@ it("never leaks sensitive registration values into the inspection", async () => 
     healthProbe: async () => ({ error: "fixture-secret must not echo" }),
   });
   expect(JSON.stringify(inspection)).not.toContain("fixture-secret");
+});
+
+const probeFakeConnection = (
+  overrides: {
+    readonly version?: string;
+    readonly connectError?: Error;
+    readonly closeError?: Error;
+  } = {},
+) => ({
+  connectCalls: 0,
+  childAlive: false,
+  async connect(): Promise<readonly string[]> {
+    this.connectCalls += 1;
+    if (overrides.connectError !== undefined) throw overrides.connectError;
+    this.childAlive = true;
+    return ["decompile_method", "disassemble_method"];
+  },
+  async call(): Promise<never> {
+    throw new Error("health probe never calls tools");
+  },
+  serverInfo(): unknown {
+    return overrides.version === undefined
+      ? {}
+      : { version: overrides.version };
+  },
+  detach(): void {},
+  async close(): Promise<void> {
+    if (overrides.closeError !== undefined) throw overrides.closeError;
+    this.childAlive = false;
+  },
+});
+
+it("default health probe returns the declared server version", async () => {
+  const path = await registrationPath({ command: "ilspy-mcp" });
+  const fake = probeFakeConnection({ version: "9.1.0" });
+  const probe = createIlspyMcpHealthProbe(() => fake as never);
+  expect(await probe(path)).toBe("9.1.0");
+  expect(fake.connectCalls).toBe(1);
+  expect(fake.childAlive).toBe(false);
+});
+
+it("default health probe maps failures to fixed error literals", async () => {
+  const path = await registrationPath({ command: "ilspy-mcp" });
+  const startup = createIlspyMcpHealthProbe(
+    () =>
+      probeFakeConnection({ connectError: new Error("spawn boom") }) as never,
+  );
+  expect(await startup(path)).toEqual({ error: "startup" });
+  const cleanup = createIlspyMcpHealthProbe(
+    () =>
+      probeFakeConnection({
+        version: "9.1.0",
+        closeError: new Error("kill"),
+      }) as never,
+  );
+  expect(await cleanup(path)).toEqual({ error: "cleanup" });
+  const invalid = await registrationPath({ command: "ilspy-mcp" });
+  await writeFile(invalid, "{ not json", "utf8");
+  const registration = createIlspyMcpHealthProbe(
+    () => probeFakeConnection() as never,
+  );
+  expect(await registration(invalid)).toEqual({ error: "registration" });
+});
+
+it("default health probe refuses http registrations before connecting", async () => {
+  const path = await registrationPath({
+    type: "http",
+    url: "http://127.0.0.1:42587/mcp",
+  });
+  let connected = false;
+  const probe = createIlspyMcpHealthProbe(() => {
+    connected = true;
+    return probeFakeConnection() as never;
+  });
+  expect(await probe(path)).toEqual({
+    error:
+      "phase one supports stdio only; HTTP registrations validate but are refused at use",
+  });
+  expect(connected).toBe(false);
 });

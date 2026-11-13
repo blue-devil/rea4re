@@ -1,5 +1,6 @@
 import { withCommandCancellation } from "./commandCancellation.js";
 import { z } from "incur";
+import { createIlspyMcpHealthProbe } from "../ilspy/IlspyDoctor.js";
 
 import type { DoctorScope } from "../application/Doctor.js";
 import {
@@ -161,7 +162,11 @@ const registerDoctorCommand = (
             ]);
           return runDoctorOwned(
             options.target,
-            createSystemDoctorHost(environment, signal),
+            createSystemDoctorHost(
+              environment,
+              signal,
+              createIlspyMcpHealthProbe(),
+            ),
             doctorScope(options),
           );
         }),
@@ -257,7 +262,10 @@ const runSetupCommand = async (
     ]);
   const result = await runSetup(
     { ...setupRunOptions(input, interactive, hasExplicitScope), signal },
-    systemSetupHost(createSystemDoctorHost(environment, signal), environment),
+    systemSetupHost(
+      createSystemDoctorHost(environment, signal, createIlspyMcpHealthProbe()),
+      environment,
+    ),
     interactive
       ? (actions, context) =>
           confirmInteractiveSetup(actions, options.accessible, context, signal)

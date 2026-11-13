@@ -3,6 +3,8 @@ import type {
   DoctorProviderInspection,
 } from "../application/Doctor.js";
 import { readIlspyMcpConfiguration } from "./IlspyMcpConfiguration.js";
+import { createIlspyMcpConnection } from "./IlspyMcpConnection.js";
+import { IlspyMcpSessionClient } from "./IlspyMcpSessionClient.js";
 import { AnalysisCancelledError } from "../domain/analysisErrorCore.js";
 
 /** Client settings consulted by this readiness probe. */
@@ -127,3 +129,43 @@ const inspectHealth = async (
     },
   };
 };
+
+/** Bounded probe budget shared with the doctor host's other short host probes. */
+export const ILSPY_MCP_HEALTH_TIMEOUT_MS = 10_000;
+
+const PROBE_REGISTRATION_ERROR = "registration";
+const PROBE_STARTUP_ERROR = "startup";
+const PROBE_CLEANUP_ERROR = "cleanup";
+
+/**
+ * Live stdio health probe for production doctor hosts: open, read the declared
+ * version, close. Connection construction is injectable for tests; error
+ * strings are fixed literals because probe text may echo registration-derived
+ * values and must never be admitted verbatim.
+ */
+export const createIlspyMcpHealthProbe =
+  (
+    connect: typeof createIlspyMcpConnection = createIlspyMcpConnection,
+  ): IlspyMcpHealthProbe =>
+  async (configPath: string) => {
+    const registration = await readIlspyMcpConfiguration(configPath);
+    if (!registration.ok) return { error: PROBE_REGISTRATION_ERROR };
+    if (registration.value.type === "http") return { error: STDIO_ONLY };
+    const client = new IlspyMcpSessionClient(
+      connect(
+        registration.value,
+        ILSPY_MCP_HEALTH_TIMEOUT_MS,
+        process.env as Readonly<NodeJS.ProcessEnv>,
+      ),
+      "doctor health probe",
+    );
+    const opened = await client.open();
+    if (!opened.ok) return { error: PROBE_STARTUP_ERROR };
+    const version = opened.value.serverVersion ?? undefined;
+    let cleanupFailed = false;
+    await client.close().catch(() => {
+      cleanupFailed = true;
+    });
+    if (cleanupFailed) return { error: PROBE_CLEANUP_ERROR };
+    return version;
+  };
