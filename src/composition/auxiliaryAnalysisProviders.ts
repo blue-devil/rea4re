@@ -19,6 +19,7 @@ export const auxiliaryAnalysisProviderDeclarations = (
   selectedEnvironment: Readonly<NodeJS.ProcessEnv>,
   platform: NodeJS.Platform = process.platform,
   settings?: AnalysisSettingsReader,
+  config: { readonly ilspyMcpConfigPath?: string } = {},
 ): readonly AuxiliaryProviderDeclaration[] => {
   const environment = snapshotEnvironment(selectedEnvironment, platform);
   return [
@@ -46,7 +47,11 @@ export const auxiliaryAnalysisProviderDeclarations = (
       load: async () => {
         const { ManagedStaticProvider } =
           await import("../dotnet/ManagedStaticProvider.js");
-        return new ManagedStaticProvider();
+        const managedConfig =
+          config.ilspyMcpConfigPath === undefined
+            ? {}
+            : { ilspyMcpConfigPath: config.ilspyMcpConfigPath };
+        return new ManagedStaticProvider(managedConfig);
       },
     },
   ];

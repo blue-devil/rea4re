@@ -71,6 +71,7 @@ const composeDeepBinarySession = (
     environment,
     process.platform,
     settings,
+    config,
   );
   const nativeInspectionAvailable =
     inspection !== undefined &&
@@ -133,10 +134,17 @@ const createBundleResourceFactory = (
 };
 
 /** Compose an execution-free managed session without native provider selection. */
-export const createManagedBinarySession = (): BinarySession =>
-  composeBinarySession(new AnalysisProviderRegistry([]), [
-    new ManagedStaticProvider(),
+export const createManagedBinarySession = (
+  config: { readonly ilspyMcpConfigPath?: string } = {},
+): BinarySession => {
+  const managedConfig =
+    config.ilspyMcpConfigPath === undefined
+      ? {}
+      : { ilspyMcpConfigPath: config.ilspyMcpConfigPath };
+  return composeBinarySession(new AnalysisProviderRegistry([]), [
+    new ManagedStaticProvider(managedConfig),
   ]);
+};
 
 /** Compose the artifact operations without candidates for deep analysis engines. */
 export const createArtifactBinarySession = (
