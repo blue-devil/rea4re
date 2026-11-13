@@ -72,6 +72,10 @@ import {
   type DesktopBuildFacts,
   type DesktopBuildFactsInput,
 } from "./DesktopBuildDoctor.js";
+import {
+  readIlspyMcpConfiguration,
+  type IlspyMcpRegistration,
+} from "../ilspy/IlspyMcpConfiguration.js";
 
 /** One actionable environment diagnostic. */
 export interface DoctorCheck {
@@ -129,6 +133,7 @@ export interface DoctorHost {
    */
   readonly nativeConfiguration?: NativeAnalysisConfigurationInspection;
   readonly configuredIlspyCmdPath?: string;
+  readonly configuredIlspyMcpConfig?: string;
   macosVersion(): Promise<string | undefined>;
   linuxDistribution(): Promise<LinuxDistribution | undefined>;
   validTarget(path: string): Promise<boolean>;
@@ -161,6 +166,10 @@ export interface DoctorHost {
     ) => void,
   ): Promise<readonly ClientRegistrationStatus[]>;
   ilspyCmdVersion?(path: string): Promise<string | undefined>;
+  /** Probe the configured ILSpy MCP server: open, read its declared version, close. */
+  ilspyMcpHealth?(
+    configPath: string,
+  ): Promise<string | undefined | { error: string }>;
   /** Desktop build host facts; read only when that scope is selected. */
   desktopBuildFacts?(clientIds: readonly string[]): Promise<DesktopBuildFacts>;
 }
@@ -636,6 +645,11 @@ export interface SystemDoctorHostOptions {
     signal: AbortSignal,
     clients: readonly string[],
   ) => Promise<readonly DoctorProviderInspection[]>;
+  /** Spawn the configured ILSpy MCP server once and read its declared version. */
+  readonly ilspyMcpProbe?: (
+    registration: IlspyMcpRegistration,
+    signal?: AbortSignal,
+  ) => Promise<string | { error: string }>;
   readonly resolveProviderRequestBudget?: (
     provider: Parameters<ProviderRequestBudgetResolver>[0],
     environment: Parameters<ProviderRequestBudgetResolver>[1],
@@ -745,6 +759,9 @@ export const systemDoctorHost = (
     ...(environment.REA_ILSPY_CMD_PATH === undefined
       ? {}
       : { configuredIlspyCmdPath: environment.REA_ILSPY_CMD_PATH }),
+    ...(environment.REA_ILSPY_MCP_CONFIG === undefined
+      ? {}
+      : { configuredIlspyMcpConfig: environment.REA_ILSPY_MCP_CONFIG }),
     macosVersion: () =>
       readMacosVersion(hostExecFileOutput, commandEnvironment),
     linuxDistribution: () => readLinuxDistribution(architecture),
@@ -829,6 +846,22 @@ export const systemDoctorHost = (
         return undefined;
       }
     },
+    ...(options.ilspyMcpProbe === undefined
+      ? {}
+      : {
+          ilspyMcpHealth: async (configPath: string) => {
+            const registration = await readIlspyMcpConfiguration(configPath, {
+              signal: inspectionSignal,
+            });
+            if (!registration.ok) return { error: registration.error.message };
+            if (!("command" in registration.value))
+              return {
+                error:
+                  "The registration selects an HTTP transport; phase one supports stdio only.",
+              };
+            return options.ilspyMcpProbe!(registration.value, inspectionSignal);
+          },
+        }),
     async installationPaths() {
       try {
         const command = platform === "win32" ? "where" : "which";
