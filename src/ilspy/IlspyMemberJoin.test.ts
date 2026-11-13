@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import type { ManagedMemberInspection } from "../domain/managed/managedArtifact.js";
 import { managedReconstructionImportInputSchema } from "../domain/managed/managedReconstruction.js";
 import {
+  ilspySelectionFromToolReply,
   buildIlspyReconstructionRequest,
   uniqueNameMethods,
   type IlspyMemberSelection,
@@ -206,6 +207,35 @@ describe("buildIlspyReconstructionRequest", () => {
       ["0x06000001", "upstream_failure"],
       ["0x06000005", "upstream_failure"],
     ]);
+  });
+});
+
+describe("ilspySelectionFromToolReply", () => {
+  it("retains the raw reply text when parsing fails", () => {
+    const raw = "int Alpha() => 1;\n[pagination:{bogus}]";
+    const selection = ilspySelectionFromToolReply(
+      { ok: true, value: raw },
+      "0x06000001",
+      "decompiled-csharp",
+    );
+    expect(selection).toEqual({
+      token: "0x06000001",
+      text: "",
+      kind: "decompiled-csharp",
+      truncated: false,
+      upstream_failure: true,
+      raw,
+    });
+  });
+
+  it("keeps no raw field for admitted replies", () => {
+    const selection = ilspySelectionFromToolReply(
+      { ok: true, value: "int Alpha() => 1;" },
+      "0x06000001",
+      "decompiled-csharp",
+    );
+    expect(selection.raw).toBeUndefined();
+    expect(selection.text).toBe("int Alpha() => 1;");
   });
 });
 

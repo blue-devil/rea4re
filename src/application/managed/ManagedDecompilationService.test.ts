@@ -261,6 +261,57 @@ describe("decompileManagedMembersEvidence refusals", () => {
     expect(outcome.error.message).toContain("stdio");
   });
 
+  it("excludes an unparseable reply as upstream_failure with its raw text", async () => {
+    const inspection = fixtureInspection({
+      methodRowCount: 2,
+      distinctMemberNames: true,
+    });
+    const fake = new FakeIlspyConnection();
+    const raw = "int Method0() => 1;\n[pagination:{bogus}]";
+    fake.replies = [() => raw, () => "int Method1() => 2;"];
+    const { evidence, body } = evidenceOf(await run(inspection, fake));
+    const excluded = body.methods.find((m) => m.status === "excluded");
+    expect(excluded?.reason).toContain("upstream_failure");
+    expect(excluded?.reason).toContain(`raw text: ${raw}`);
+    expect(evidence.limitations.join(" ")).toContain(raw);
+    expect(
+      body.methods.filter((m) => m.status === "reconstructed"),
+    ).toHaveLength(1);
+  });
+
+  it("reports unknown requested member names in the limitations", async () => {
+    const inspection = fixtureInspection({
+      methodRowCount: 1,
+      distinctMemberNames: true,
+    });
+    const fake = new FakeIlspyConnection();
+    fake.replies = [() => "int Method0() => 1;"];
+    const { evidence, body } = evidenceOf(
+      await run(inspection, fake, {
+        input: { member_names: [inspection.methods[0]!.name, "NoSuchMethod"] },
+      }),
+    );
+    expect(body.methods).toHaveLength(1);
+    expect(body.methods[0]?.status).toBe("reconstructed");
+    expect(evidence.limitations.join(" ")).toContain(
+      "Unknown requested member names",
+    );
+    expect(evidence.limitations.join(" ")).toContain("NoSuchMethod");
+  });
+
+  it("keeps the retained-resource note when the analysis itself fails", async () => {
+    const inspection = fixtureInspection({ methodRowCount: 1 });
+    const fake = new FakeIlspyConnection();
+    fake.tools = ["decompile_method"];
+    fake.closeError = new Error("child refused termination");
+    const outcome = await run(inspection, fake);
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) throw new Error("expected err");
+    expect(JSON.stringify(outcome.error.diagnostics ?? {})).toContain(
+      "Incomplete cleanup",
+    );
+  });
+
   it("refuses with a ConfigurationError naming REA_ILSPY_MCP_CONFIG when unconfigured", async () => {
     const outcome = await decompileManagedMembersEvidence(
       {

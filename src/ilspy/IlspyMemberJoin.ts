@@ -14,6 +14,8 @@ export type IlspyMemberSelection = {
   text: string;
   kind: "decompiled-csharp" | "decompiled-il";
   truncated: boolean;
+  /** Raw upstream reply retained when parsing failed, for hand-import. */
+  readonly raw?: string;
   /** No admitted upstream text; excluded as upstream_failure. */
   readonly upstream_failure?: boolean;
 };
@@ -166,7 +168,14 @@ export const ilspySelectionFromToolReply = (
     return { token, text: "", kind, truncated: false, upstream_failure: true };
   const parsed = parseIlspyToolText(call.value);
   if (!parsed.ok)
-    return { token, text: "", kind, truncated: false, upstream_failure: true };
+    return {
+      token,
+      text: "",
+      kind,
+      truncated: false,
+      upstream_failure: true,
+      raw: call.value,
+    };
   return {
     token,
     text: parsed.value.body,

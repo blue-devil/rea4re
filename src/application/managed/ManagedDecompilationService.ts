@@ -116,7 +116,7 @@ export const decompileManagedMembersEvidence = async (
     assemblyPath,
   );
   if (!selection.ok) return selection;
-  const { requested, candidateTokens } = selection.value;
+  const { requested, candidateTokens, unknownMemberNames } = selection.value;
   const connect = options.connect ?? createIlspyMcpConnection;
   const client = new IlspyMcpSessionClient(
     connect(registration.value, registration.value.timeoutMs, process.env),
@@ -130,6 +130,7 @@ export const decompileManagedMembersEvidence = async (
       client,
       signal,
       command: registration.value.command,
+      unknownMemberNames,
     });
   } finally {
     try {
@@ -142,7 +143,14 @@ export const decompileManagedMembersEvidence = async (
   }
   if (outcome === undefined)
     throw new TypeError("decompile outcome was not produced");
-  if (!outcome.ok) return outcome;
+  if (!outcome.ok) {
+    // The retained-resource note must survive the failure path too.
+    if (cleanupLimitation !== undefined)
+      outcome.error.retainDiagnostics({
+        cleanup_limitation: cleanupLimitation,
+      });
+    return outcome;
+  }
   return ok(
     decompilationEvidence(outcome.value, {
       inspection,
@@ -199,6 +207,8 @@ const selectRequestedMembers = (
   {
     readonly requested: readonly ManagedMemberInspection["methods"][number][];
     readonly candidateTokens: ReadonlySet<string>;
+    /** Requested names with no member on the declaring type; never dropped silently. */
+    readonly unknownMemberNames: readonly string[];
   },
   AnalysisError
 > => {
@@ -228,6 +238,7 @@ const selectRequestedMembers = (
       ),
     );
   }
+  const knownNames = new Set(inspection.methods.map((method) => method.name));
   const candidateTokens = new Set(
     uniqueNameMethods(inspection)
       .filter(
@@ -236,7 +247,14 @@ const selectRequestedMembers = (
       )
       .map((method) => method.token),
   );
-  return ok({ requested, candidateTokens });
+  return ok({
+    requested,
+    candidateTokens,
+    unknownMemberNames:
+      memberNames === undefined
+        ? []
+        : memberNames.filter((name) => !knownNames.has(name)),
+  });
 };
 
 const decompilationEvidence = (
@@ -299,6 +317,7 @@ const runDecompilation = async (
     readonly client: IlspyMcpSessionClient;
     readonly signal: AbortSignal | undefined;
     readonly command: string;
+    readonly unknownMemberNames: readonly string[];
   },
 ): Promise<Result<DecompilationOutcome, AnalysisError>> => {
   const { outputKind, client, signal } = options;
@@ -316,7 +335,7 @@ const runDecompilation = async (
     },
   );
   if (!calls.ok) return calls;
-  const { selections, truncatedTexts } = calls.value;
+  const { selections, rawTexts } = calls.value;
   const { request, excluded } = buildIlspyReconstructionRequest(
     inspection,
     selections,
@@ -325,7 +344,7 @@ const runDecompilation = async (
     requested,
     candidateTokens,
     excluded,
-    truncatedTexts,
+    rawTexts,
   );
   if (request.methods.length === 0) {
     const message = `No requested member could be joined for reconstruction: ${exclusionLines.join("; ")}.`;
@@ -343,8 +362,9 @@ const runDecompilation = async (
     serverVersion,
     request,
     excluded,
-    truncatedTexts,
+    rawTexts,
     exclusionLines,
+    unknownMemberNames: options.unknownMemberNames,
   });
 };
 
@@ -362,7 +382,7 @@ const callUpstreamMembers = async (
   Result<
     {
       readonly selections: readonly IlspyMemberSelection[];
-      readonly truncatedTexts: ReadonlyMap<string, string>;
+      readonly rawTexts: ReadonlyMap<string, string>;
     },
     AnalysisError
   >
@@ -371,7 +391,7 @@ const callUpstreamMembers = async (
   const toolName =
     outputKind === "decompiled-il" ? "disassemble_method" : "decompile_method";
   const selections: IlspyMemberSelection[] = [];
-  const truncatedTexts = new Map<string, string>();
+  const rawTexts = new Map<string, string>();
   for (const method of requested) {
     if (!candidateTokens.has(method.token)) continue;
     if (signal?.aborted === true)
@@ -389,10 +409,13 @@ const callUpstreamMembers = async (
       method.token,
       outputKind,
     );
-    if (selection.truncated) truncatedTexts.set(method.token, selection.text);
+    if (selection.truncated) rawTexts.set(method.token, selection.text);
+    else if (selection.raw !== undefined)
+      // Parse failure keeps the raw reply so a caller can hand-import it.
+      rawTexts.set(method.token, selection.raw);
     selections.push(selection);
   }
-  return ok({ selections, truncatedTexts });
+  return ok({ selections, rawTexts });
 };
 /** Attach the observed inspection Evidence, import, and per-member rows. */
 const assembleDecompilationOutcome = async (
@@ -407,7 +430,8 @@ const assembleDecompilationOutcome = async (
       typeof buildIlspyReconstructionRequest
     >["request"];
     readonly excluded: readonly { token: string; reason: string }[];
-    readonly truncatedTexts: ReadonlyMap<string, string>;
+    readonly rawTexts: ReadonlyMap<string, string>;
+    readonly unknownMemberNames: readonly string[];
     readonly exclusionLines: readonly string[];
   },
 ): Promise<Result<DecompilationOutcome, AnalysisError>> => {
@@ -446,7 +470,7 @@ const assembleDecompilationOutcome = async (
     requested,
     importResult,
     facts.excluded,
-    facts.truncatedTexts,
+    facts.rawTexts,
   );
   return ok({
     result: {
@@ -462,6 +486,11 @@ const assembleDecompilationOutcome = async (
       methods,
       reconstruction: importResult,
       limitations: [
+        ...(facts.unknownMemberNames.length === 0
+          ? []
+          : [
+              `Unknown requested member names ignored (no such member on the declaring type): ${facts.unknownMemberNames.join(", ")}.`,
+            ]),
         ...facts.exclusionLines,
         ...(facts.outputKind === "decompiled-csharp"
           ? [CSHARP_TRUST_LIMITATION]
@@ -476,7 +505,7 @@ const memberResultRows = (
   requested: readonly ManagedMemberInspection["methods"][number][],
   importResult: ReturnType<typeof executeManagedReconstructionImport>,
   excluded: readonly { token: string; reason: string }[],
-  truncatedTexts: ReadonlyMap<string, string>,
+  rawTexts: ReadonlyMap<string, string>,
 ) => {
   const joinedByToken = new Map(
     importResult.methods.map((method) => [method.token, method]),
@@ -503,7 +532,7 @@ const memberResultRows = (
       };
     }
     const reason = excludedByToken.get(method.token) ?? "ambiguous_member_name";
-    const raw = truncatedTexts.get(method.token);
+    const raw = rawTexts.get(method.token);
     return {
       token: method.token,
       declaring_type: method.declaring_type,
