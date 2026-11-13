@@ -493,6 +493,46 @@ it("shares one parsed IDA registration between timeout-budget and doctor project
   }
 });
 
+it("scopes ilspy-mcp doctor checks from the provider inspection", async () => {
+  expect(DOCTOR_PROVIDER_IDS).toContain("ilspy-mcp");
+  const root = await createTestTempDirectory("rea-ilspy-mcp-doctor-");
+  const registration = join(root, "registration.json");
+  await writeFile(registration, JSON.stringify({ command: "ilspy-mcp" }));
+  const systemHost = createSystemDoctorHost({
+    REA_ILSPY_MCP_CONFIG: registration,
+  });
+  const host = {
+    ...systemHost,
+    ...createDoctorHostFixture({
+      platform: "linux",
+      installedSkillIdentity: () => Promise.resolve(undefined),
+    }),
+  };
+  try {
+    const inspections = await host.providerInspections?.([]);
+    expect(inspections?.find(({ id }) => id === "ilspy-mcp")).toMatchObject({
+      configured: true,
+      available: true,
+      checks: [{ name: "registration", ok: true }],
+    });
+    const report = await runDoctor(undefined, host, {
+      providers: ["ilspy-mcp"],
+    });
+    expect(report.scope_checks).toContainEqual(
+      expect.objectContaining({
+        name: "ilspy-mcp-registration",
+        ok: true,
+      }),
+    );
+    expect(
+      report.scope_checks.filter(
+        ({ classification }) => classification === "missing_analysis_engine",
+      ),
+    ).toEqual([]);
+  } finally {
+    await host.close?.();
+  }
+});
 it("carries a validated REA_KUNA_COMMAND into the provider registration environment", async () => {
   expect(DOCTOR_PROVIDER_IDS).toContain("kuna");
   const root = await createTestTempDirectory("rea-kuna-registration-");
