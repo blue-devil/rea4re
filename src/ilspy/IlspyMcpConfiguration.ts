@@ -1,4 +1,3 @@
-import { isAbsolute } from "node:path";
 import { z } from "zod";
 import { jsonRecordSchema } from "../domain/jsonRecord.js";
 import { ConfigurationError } from "../domain/configurationErrors.js";
