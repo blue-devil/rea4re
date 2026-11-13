@@ -42,8 +42,8 @@ export const inspectIlspyMcpRegistration = async (
       : undefined;
   return {
     id: "ilspy-mcp",
-    configured: path !== undefined,
     available: valid && (health === undefined || health.ok),
+    configured: path !== undefined,
     providerVersion: health?.ok === true ? (health.version ?? null) : null,
     registrationEnvironment:
       valid && path !== undefined ? { REA_ILSPY_MCP_CONFIG: path } : {},

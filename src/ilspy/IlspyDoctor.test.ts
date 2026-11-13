@@ -58,10 +58,12 @@ it("accepts a valid stdio registration without probing the server", async () => 
   expect(
     inspection.checks.find(({ name }) => name === "registration"),
   ).toMatchObject({ ok: true, code: null });
-  // Registration validity never launches the upstream server.
-  expect(probes).toBe(1); // only the explicitly supplied health probe ran
+  // Registration validity never launches the upstream server; only an
+  // explicitly supplied probe does, and without one there is no health verdict.
+  expect(probes).toBe(1);
   await expect(inspectIlspyMcpRegistration(path)).resolves.toMatchObject({
     available: true,
+    checks: [{ name: "registration", ok: true }],
   });
 });
 

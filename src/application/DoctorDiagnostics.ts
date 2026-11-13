@@ -11,7 +11,6 @@ import type {
   DoctorHost,
   DoctorProviderInspection,
 } from "./Doctor.js";
-import { inspectIlspyMcpRegistration } from "../ilspy/IlspyDoctor.js";
 
 /** Ordered environment diagnostics consumed by the Doctor report assembler. */
 export interface DoctorDiagnostics {
@@ -43,7 +42,6 @@ export const collectDoctorDiagnostics = async (
 
   const ilspyCheck = await optionalIlspyCheck(host);
   if (ilspyCheck !== undefined) checks.push(ilspyCheck);
-  checks.push(...(await optionalIlspyMcpChecks(host)));
   const hopperDemoCheck = await optionalHopperDemoCheck(host, hopperPath);
   if (hopperDemoCheck !== undefined) checks.push(hopperDemoCheck);
   const targetCheck = await optionalTargetCheck(target, host);
@@ -321,19 +319,6 @@ const optionalIlspyCheck = async (
       classification: "config_drift",
     },
   );
-};
-
-const optionalIlspyMcpChecks = async (
-  host: DoctorHost,
-): Promise<readonly DoctorCheck[]> => {
-  const path = host.configuredIlspyMcpConfig;
-  if (path === undefined) return [];
-  const inspection = await inspectIlspyMcpRegistration(path, {
-    ...(host.ilspyMcpHealth === undefined
-      ? {}
-      : { healthProbe: host.ilspyMcpHealth }),
-  });
-  return providerDoctorChecks(inspection);
 };
 
 const optionalTargetCheck = async (

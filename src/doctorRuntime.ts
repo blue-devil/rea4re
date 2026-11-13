@@ -41,6 +41,7 @@ import { homeDirectoryFromEnvironment } from "./config/homeDirectory.js";
 import {
   ILSPY_MCP_DOCTOR_SETTINGS,
   inspectIlspyMcpRegistration,
+  type IlspyMcpHealthProbe,
 } from "./ilspy/IlspyDoctor.js";
 import {
   inspectLinuxHopperPythonRuntime,
@@ -302,6 +303,7 @@ const unresolvedProvider = (
 export const createSystemDoctorHost = (
   environment: Readonly<NodeJS.ProcessEnv> = process.env,
   signal?: AbortSignal,
+  ilspyMcpHealth?: IlspyMcpHealthProbe,
 ): DoctorHost => {
   const registrationReads = new WeakMap<
     RetainedResourceScope,
@@ -367,16 +369,6 @@ export const createSystemDoctorHost = (
         environment,
       );
       const ilspyMcpConfig = inspectionEnvironment.REA_ILSPY_MCP_CONFIG;
-      // The unselected-client path is covered by the doctor diagnostics
-      // builder; only a client-supplied override needs its own inspection.
-      const clientIlspyInspection =
-        selected !== undefined &&
-        ilspyMcpConfig !== undefined &&
-        ilspyMcpConfig !== environment.REA_ILSPY_MCP_CONFIG
-          ? await inspectIlspyMcpRegistration(ilspyMcpConfig, {
-              signal: inspectionSignal,
-            })
-          : undefined;
       return [
         unresolvedProvider(
           "ghidra",
@@ -428,7 +420,16 @@ export const createSystemDoctorHost = (
             resourceScope,
             signal: inspectionSignal,
           })),
-        ...(clientIlspyInspection === undefined ? [] : [clientIlspyInspection]),
+        ...(ilspyMcpConfig === undefined
+          ? []
+          : [
+              await inspectIlspyMcpRegistration(ilspyMcpConfig, {
+                signal: inspectionSignal,
+                ...(ilspyMcpHealth === undefined
+                  ? {}
+                  : { healthProbe: ilspyMcpHealth }),
+              }),
+            ]),
       ] satisfies readonly DoctorProviderInspection[];
     },
     desktopBuildFacts: readDesktopBuildFacts,
