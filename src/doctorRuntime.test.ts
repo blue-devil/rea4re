@@ -533,6 +533,40 @@ it("scopes ilspy-mcp doctor checks from the provider inspection", async () => {
     await host.close?.();
   }
 });
+
+it("reports a healthy not-configured ilspy-mcp observation without config", async () => {
+  const systemHost = createSystemDoctorHost({});
+  const host = {
+    ...systemHost,
+    ...createDoctorHostFixture({
+      platform: "linux",
+      installedSkillIdentity: () => Promise.resolve(undefined),
+    }),
+  };
+  try {
+    const inspections = await host.providerInspections?.([]);
+    const inspection = inspections?.find(({ id }) => id === "ilspy-mcp");
+    expect(inspection).toMatchObject({
+      configured: false,
+      available: true,
+    });
+    expect(inspection?.checks[0]).toMatchObject({
+      name: "registration",
+      ok: true,
+      remediation: null,
+    });
+    const report = await runDoctor(undefined, host, {
+      providers: ["ilspy-mcp"],
+    });
+    expect(
+      report.scope_checks.filter(
+        ({ classification }) => classification === "missing_analysis_engine",
+      ),
+    ).toEqual([]);
+  } finally {
+    await host.close?.();
+  }
+});
 it("carries a validated REA_KUNA_COMMAND into the provider registration environment", async () => {
   expect(DOCTOR_PROVIDER_IDS).toContain("kuna");
   const root = await createTestTempDirectory("rea-kuna-registration-");

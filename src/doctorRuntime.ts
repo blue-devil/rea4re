@@ -420,16 +420,12 @@ export const createSystemDoctorHost = (
             resourceScope,
             signal: inspectionSignal,
           })),
-        ...(ilspyMcpConfig === undefined
-          ? []
-          : [
-              await inspectIlspyMcpRegistration(ilspyMcpConfig, {
-                signal: inspectionSignal,
-                ...(ilspyMcpHealth === undefined
-                  ? {}
-                  : { healthProbe: ilspyMcpHealth }),
-              }),
-            ]),
+        await inspectIlspyMcpRegistration(ilspyMcpConfig, {
+          signal: inspectionSignal,
+          ...(ilspyMcpHealth === undefined
+            ? {}
+            : { healthProbe: ilspyMcpHealth }),
+        }),
       ] satisfies readonly DoctorProviderInspection[];
     },
     desktopBuildFacts: readDesktopBuildFacts,

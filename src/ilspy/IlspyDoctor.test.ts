@@ -31,7 +31,7 @@ it("treats an absent registration as a normal observation", async () => {
   expect(inspection).toMatchObject({
     id: "ilspy-mcp",
     configured: false,
-    available: false,
+    available: true,
     providerVersion: null,
     registrationEnvironment: {},
   });
