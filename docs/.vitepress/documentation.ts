@@ -329,6 +329,11 @@ export const documentationSections = [
         route: "/raw-binary",
       },
       {
+        text: "ILSpy-MCP managed decompilation source",
+        source: "providers/ilspy-mcp.md",
+        route: "/ilspy-mcp",
+      },
+      {
         text: "IDA provider",
         source: "providers/ida-provider.md",
         route: "/ida-provider",
