@@ -15,6 +15,7 @@ class FakeIlspyConnection {
   calls: readonly (readonly [string, unknown])[] = [];
   connectError: Error | undefined;
   callError: Error | undefined;
+  closeError: Error | undefined;
   childAlive = false;
   serverInfoValue: JsonValue = { version: "1.2.3-test" };
   async connect(): Promise<readonly string[]> {
