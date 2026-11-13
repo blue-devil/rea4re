@@ -17,6 +17,7 @@ import {
   managedTargetInputSchema,
   type ManagedToolName,
 } from "../contracts/managed/managedToolContracts.js";
+import { decompileManagedMembersEvidence } from "../application/managed/ManagedDecompilationService.js";
 import { AnalysisError } from "../domain/analysisErrorBase.js";
 import type { BinaryTarget } from "../domain/binaryTargetTypes.js";
 import {
@@ -50,6 +51,9 @@ import {
 
 /** Execution-free managed PE/CLI auxiliary provider. */
 export class ManagedStaticProvider implements AnalysisProvider {
+  constructor(
+    private readonly config: { readonly ilspyMcpConfigPath?: string } = {},
+  ) {}
   readonly #capabilities: readonly CapabilityDescriptor[] =
     managedStaticCapabilities();
 
@@ -62,7 +66,7 @@ export class ManagedStaticProvider implements AnalysisProvider {
   }
 
   createClient(target: BinaryTarget): AnalysisClient {
-    return new ManagedStaticClient(target);
+    return new ManagedStaticClient(target, this.config);
   }
 }
 
@@ -70,7 +74,10 @@ class ManagedStaticClient implements AnalysisClient {
   #snapshotBytes: Buffer | undefined;
   readonly #resources = new ArtifactResourceScope();
 
-  constructor(private readonly target: BinaryTarget) {}
+  constructor(
+    private readonly target: BinaryTarget,
+    private readonly config: { readonly ilspyMcpConfigPath?: string },
+  ) {}
 
   async execute(
     operation: AnalysisOperation,
@@ -98,6 +105,8 @@ class ManagedStaticClient implements AnalysisClient {
         ),
       );
     try {
+      if (operation === "decompile_managed_members")
+        return this.#decompile(parameters, options);
       const input =
         operation === "inspect_managed_members"
           ? managedMembersInputSchema.safeParse(parameters)
@@ -193,6 +202,35 @@ class ManagedStaticClient implements AnalysisClient {
     } catch (cause: unknown) {
       return err(this.#cleanupError("close", cause));
     }
+  }
+
+  /** Dispatch the ILSpy-MCP decompilation workflow and carry its result body. */
+  async #decompile(
+    parameters: Readonly<Record<string, JsonValue>>,
+    options?: ExecutionOptions,
+  ) {
+    const result = await decompileManagedMembersEvidence(
+      parameters,
+      undefined,
+      {
+        ...(options?.signal === undefined ? {} : { signal: options.signal }),
+        configPath: this.config.ilspyMcpConfigPath,
+      },
+    );
+    if (!result.ok) return result;
+    const evidence = result.value;
+    return ok(
+      createAnalysisExecution(
+        evidence.normalized_result,
+        MANAGED_STATIC_PROVIDER,
+        {
+          rawResult: null,
+          limitations: evidence.limitations,
+          subject: this.target,
+          locations: [{ kind: "artifact-path", path: this.target.path }],
+        },
+      ),
+    );
   }
 
   #cleanupError(operation: string, cause: unknown): ProviderCleanupError {
