@@ -12,7 +12,7 @@ import {
 class FakeIlspyConnection {
   tools: readonly string[] = [...REQUIRED_ILSPY_TOOLS];
   connectCalls = 0;
-  calls: readonly (readonly [string, unknown])[] = [];
+  calls: [string, unknown][] = [];
   connectError: Error | undefined;
   callError: Error | undefined;
   closeError: Error | undefined;
@@ -101,7 +101,10 @@ describe("IlspyMcpSessionClient", () => {
     const originalCall = fake.call.bind(fake);
     fake.call = async (name: string, args: unknown) => {
       order.push(`start:${name}`);
-      const { promise, resolve } = Promise.withResolvers<void>();
+      let resolve!: () => void;
+      const promise = new Promise<void>((r) => {
+        resolve = r;
+      });
       queueMicrotask(resolve);
       await promise;
       order.push(`end:${name}`);
@@ -178,11 +181,12 @@ describe("IlspyMcpSessionClient", () => {
       sensitive: { headers: [], env: [] },
       timeoutMs: 300000,
     };
+    const { timeoutMs } = registration;
     expect(() =>
-      createIlspyMcpConnection(registration, registration.timeoutMs),
+      createIlspyMcpConnection(registration, timeoutMs, process.env),
     ).toThrow(ConfigurationError);
     expect(() =>
-      createIlspyMcpConnection(registration, registration.timeoutMs),
+      createIlspyMcpConnection(registration, timeoutMs, process.env),
     ).toThrow(/stdio/);
   });
 

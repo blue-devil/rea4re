@@ -54,9 +54,14 @@ describe("ManagedStaticProvider decompile_managed_members dispatch", () => {
 
   it("refuses a non-PE target before the workflow runs", async () => {
     const bytes = buildManagedPeFixture();
+    const { path, sha256 } = managedPeFixtureTarget(bytes);
     const client = new ManagedStaticProvider().createClient({
-      ...managedPeFixtureTarget(bytes),
+      path,
+      sha256,
+      kind: "executable",
       format: "elf",
+      architecture: "x86_64",
+      availableArchitectures: ["x86_64"],
     });
     try {
       const outcome = await client.execute(

@@ -82,7 +82,7 @@ const evidenceOf = (
   if (!outcome.ok) throw new Error(`expected ok: ${String(outcome.error)}`);
   return {
     evidence: outcome.value,
-    body: outcome.value.normalized_result as DecompilationResultBody,
+    body: outcome.value.normalized_result as unknown as DecompilationResultBody,
   };
 };
 

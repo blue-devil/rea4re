@@ -56,6 +56,8 @@ it("fails closed naming REA_ILSPY_MCP_CONFIG when the auxiliary provider has no 
     undefined,
     {},
   ).filter(({ identity }) => identity === MANAGED_STATIC_PROVIDER);
+  if (declaration === undefined)
+    throw new Error("managed static provider declaration missing");
   const provider = (await declaration.load()) as ManagedStaticProvider;
   const target = await parseBinaryTarget(path);
   if (!target.ok) throw target.error;
