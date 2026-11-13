@@ -37,7 +37,7 @@ server, and returns the same hash-locked reconstruction Evidence as the manual
 doctor, the per-member exclusion reasons, and the C#/IL trust model:
 
 ```bash
-rea4re decompile-managed-members /absolute/path/Assembly.dll --type Namespace.Type --json
+rea4re decompile-managed-members /absolute/path/Assembly.dll Namespace.Type --json
 ```
 
 ## Inspect an assembly

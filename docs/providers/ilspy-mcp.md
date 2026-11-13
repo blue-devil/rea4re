@@ -42,8 +42,8 @@ The workflow command is `rea4re decompile-managed-members`, following the `impor
 
 ```bash
 rea4re decompile-managed-members /absolute/path/Assembly.dll \
-  --type Newtonsoft.Json.JsonTextReader \
-  --members ParseReadNumber --output-kind decompiled-csharp --json
+  Newtonsoft.Json.JsonTextReader \
+  --member-names ParseReadNumber --output-kind decompiled-csharp --json
 ```
 
 Inputs are the assembly path, one declaring type (optionally narrowed to member names), and an output kind: `decompiled-csharp` (default) or `decompiled-il`. The operation inspects the selection with REA's own member reader first, spawns the configured stdio server once for the operation, decompiles each selected member, and internally executes the existing reconstruction import against REA's own locks. The connection is closed before the operation returns.
