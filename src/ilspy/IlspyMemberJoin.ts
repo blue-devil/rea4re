@@ -1,5 +1,8 @@
 import { createHash } from "node:crypto";
 
+import type { Result } from "../domain/result.js";
+import { parseIlspyToolText } from "./IlspyMcpResponseParser.js";
+
 import type { ManagedMemberInspection } from "../domain/managed/managedArtifact.js";
 import type { ManagedReconstructionImportRequest } from "../domain/managed/managedReconstruction.js";
 
@@ -11,6 +14,8 @@ export type IlspyMemberSelection = {
   text: string;
   kind: "decompiled-csharp" | "decompiled-il";
   truncated: boolean;
+  /** No admitted upstream text; excluded as upstream_failure. */
+  readonly upstream_failure?: boolean;
 };
 
 /** Why one selection did not join; every selection joins or appears here exactly once. */
@@ -24,7 +29,8 @@ export type IlspyJoinExclusion = {
     | "empty_text"
     | "truncated_text"
     | "unknown_token"
-    | "token_mismatch";
+    | "token_mismatch"
+    | "upstream_failure";
 };
 
 type JoinResult = {
@@ -65,7 +71,7 @@ const exclusion = (
  */
 export function buildIlspyReconstructionRequest(
   inspection: ManagedMemberInspection,
-  selections: IlspyMemberSelection[],
+  selections: readonly IlspyMemberSelection[],
 ): JoinResult {
   const ambiguousTokens = new Set(
     uniqueNameMethods(inspection).map((method) => method.token),
@@ -77,14 +83,19 @@ export function buildIlspyReconstructionRequest(
     const row = inspection.methods.find(
       (method) => method.token === selection.token,
     );
-    // Precedence: unknown_token, ambiguous_member_name, missing_normalized_il,
-    // truncated_text, empty_text, token_mismatch — first match only.
+    // Precedence: unknown_token, ambiguous_member_name, upstream_failure,
+    // missing_normalized_il, truncated_text, empty_text, token_mismatch —
+    // first match only.
     if (row === undefined) {
       excluded.push(exclusion(selection, row, "unknown_token"));
       continue;
     }
     if (!ambiguousTokens.has(selection.token)) {
       excluded.push(exclusion(selection, row, "ambiguous_member_name"));
+      continue;
+    }
+    if (selection.upstream_failure === true) {
+      excluded.push(exclusion(selection, row, "upstream_failure"));
       continue;
     }
     if (
@@ -144,3 +155,48 @@ export function buildIlspyReconstructionRequest(
     excluded,
   };
 }
+
+/** Decode one upstream reply into a selection; failures stay excluded. */
+export const ilspySelectionFromToolReply = (
+  call: Result<unknown, unknown>,
+  token: string,
+  kind: IlspyMemberSelection["kind"],
+): IlspyMemberSelection => {
+  if (!call.ok || typeof call.value !== "string")
+    return { token, text: "", kind, truncated: false, upstream_failure: true };
+  const parsed = parseIlspyToolText(call.value);
+  if (!parsed.ok)
+    return { token, text: "", kind, truncated: false, upstream_failure: true };
+  return {
+    token,
+    text: parsed.value.body,
+    kind,
+    truncated: parsed.value.pagination?.truncated ?? false,
+  };
+};
+
+/** One limitation line per excluded or ambiguous member, with its raw text. */
+export const ilspyExclusionLines = (
+  requested: readonly { readonly token: string; readonly name: string }[],
+  candidateTokens: ReadonlySet<string>,
+  excluded: readonly { readonly token: string; readonly reason: string }[],
+  truncatedTexts: ReadonlyMap<string, string>,
+): readonly string[] => {
+  const reasons = new Map(excluded.map((item) => [item.token, item.reason]));
+  return requested
+    .filter(
+      (method) =>
+        !candidateTokens.has(method.token) || reasons.has(method.token),
+    )
+    .map((method) => {
+      const reason =
+        reasons.get(method.token) ??
+        (candidateTokens.has(method.token)
+          ? undefined
+          : "ambiguous_member_name");
+      if (reason === undefined) return null;
+      const raw = truncatedTexts.get(method.token);
+      return `Excluded ${method.name} (${method.token}): ${reason}${raw === undefined ? "" : `; raw text: ${raw}`}`;
+    })
+    .filter((line): line is string => line !== null);
+};

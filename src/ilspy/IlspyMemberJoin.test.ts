@@ -189,6 +189,24 @@ describe("buildIlspyReconstructionRequest", () => {
       },
     ]);
   });
+
+  it("excludes a selection with no admitted upstream text as upstream_failure", () => {
+    const { excluded } = buildIlspyReconstructionRequest(inspection, [
+      {
+        ...csharp("0x06000001", ""),
+        upstream_failure: true,
+      },
+      // Precedence: upstream_failure beats empty_text and truncated_text.
+      {
+        ...csharp("0x06000005", "x", true),
+        upstream_failure: true,
+      },
+    ]);
+    expect(excluded.map((item) => [item.token, item.reason])).toEqual([
+      ["0x06000001", "upstream_failure"],
+      ["0x06000005", "upstream_failure"],
+    ]);
+  });
 });
 
 describe("buildIlspyReconstructionRequest exclusions and batches", () => {
