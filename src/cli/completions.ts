@@ -10,6 +10,7 @@ import {
   splitIncurBuiltinArguments,
 } from "../cliBuiltinArguments.js";
 import { CLI_OUTPUT_FORMATS, parseCliOutputArguments } from "../cliOutput.js";
+import { PRODUCT_IDENTITY } from "../identity.js";
 import { bashCompletionScript } from "./bashCompletionRegistration.js";
 import { MCP_SUBCOMMANDS } from "./mcpBuiltinCommands.js";
 import { MCP_DOCTOR_ALIAS, MCP_DOCTOR_OPTIONS } from "../mcpDoctorOptions.js";
@@ -25,7 +26,9 @@ export const completionHelpNote = (
 ): string | undefined => {
   const split = splitIncurBuiltinArguments(arguments_);
   const words =
-    split.command[0] === "rea" ? split.command.slice(1) : split.command;
+    split.command[0] === PRODUCT_IDENTITY.cliBinary
+      ? split.command.slice(1)
+      : split.command;
   if (words[0] !== "completions") return undefined;
   const rest = words.slice(1);
   if (

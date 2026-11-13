@@ -27,7 +27,7 @@ it.skipIf(process.platform === "win32")(
     const old = join(installs, "old");
     const next = join(installs, "next");
     const scriptWithin = (tag: string) =>
-      join("node_modules", ".mise", `rea-agents@${tag}`, "scripts", "rea.mjs");
+      join("node_modules", ".mise", `rea4re@${tag}`, "scripts", "rea.mjs");
     for (const [version, tag] of [
       [old, "old"],
       [next, "next"],
@@ -36,12 +36,12 @@ it.skipIf(process.platform === "win32")(
       const script = join(version, scriptWithin(tag));
       await mkdir(dirname(script), { recursive: true });
       await writeFile(script, "#!/usr/bin/env node\n", { mode: 0o700 });
-      await symlink(script, join(version, "bin", "rea"));
+      await symlink(script, join(version, "bin", "rea4re"));
     }
     const latest = join(installs, "latest");
     await symlink(old, latest, "dir");
     const unstable = join(latest, scriptWithin("old"));
-    const alias = join(latest, "bin", "rea");
+    const alias = join(latest, "bin", "rea4re");
     const command = currentClientRegistrationCommand({
       platform: "linux",
       entrypointPath: unstable,
@@ -243,13 +243,15 @@ it.skipIf(process.platform === "win32")(
     const missing = join(root, "missing");
     const unexecutable = join(root, "unexecutable");
     for (const path of [foreign, missing, unexecutable]) await mkdir(path);
-    await writeFile(join(foreign, "rea"), "different program", { mode: 0o700 });
-    await symlink(join(root, "absent"), join(missing, "rea"));
+    await writeFile(join(foreign, "rea4re"), "different program", {
+      mode: 0o700,
+    });
+    await symlink(join(root, "absent"), join(missing, "rea4re"));
     // Same identity cannot be reached via an executable launcher when the selected
     // file itself has no executable bit; no shell wrapper is inferred or run.
     const selected = join(root, "unexecutable.mjs");
     await writeFile(selected, "selected", { mode: 0o600 });
-    await symlink(selected, join(unexecutable, "rea"));
+    await symlink(selected, join(unexecutable, "rea4re"));
     expect(
       currentClientRegistrationCommand({
         platform: "linux",

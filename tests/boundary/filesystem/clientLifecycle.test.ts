@@ -109,13 +109,13 @@ describe("client configuration filesystem lifecycle", () => {
           GHIDRA_INSTALL_DIR: "/opt/ghidra",
           JAVA_HOME: "/opt/jdk-21",
         },
-        ["rea", "mcp"],
+        ["rea4re", "mcp"],
       ),
     ).toMatchObject({ status: "configured" });
     const configured = await readFile(configPath, "utf8");
     expect(configured).toContain('model = "gpt-5"');
     expect(configured).toContain("[mcp_servers.rea]");
-    expect(configured).toContain('command = "rea"');
+    expect(configured).toContain('command = "rea4re"');
     expect(configured).toContain("startup_timeout_sec = 30");
     expect(configured).toContain("tool_timeout_sec = 450");
     expect(configured).toContain('GHIDRA_INSTALL_DIR = "/opt/ghidra"');
@@ -133,7 +133,7 @@ describe("client configuration filesystem lifecycle", () => {
           GHIDRA_INSTALL_DIR: "/opt/ghidra",
           JAVA_HOME: "/opt/jdk-21",
         },
-        ["rea", "mcp"],
+        ["rea4re", "mcp"],
       ),
     ).toEqual({ status: "unchanged" });
   });
@@ -144,7 +144,7 @@ describe("client configuration filesystem lifecycle", () => {
     await mkdir(dirname(configPath), { recursive: true });
     await writeFile(
       configPath,
-      `[mcp_servers.rea]\ncommand = "rea"\nargs = ["mcp"]\nstartup_timeout_sec = 30\ntool_timeout_sec = 450\n\n[mcp_servers.rea.env]\nJAVA_HOME = "/opt/jdk-21"\nHOPPER_LAUNCHER_PATH = "/Hopper Path"\nGHIDRA_INSTALL_DIR = "/opt/ghidra"\n`,
+      `[mcp_servers.rea]\ncommand = "rea4re"\nargs = ["mcp"]\nstartup_timeout_sec = 30\ntool_timeout_sec = 450\n\n[mcp_servers.rea.env]\nJAVA_HOME = "/opt/jdk-21"\nHOPPER_LAUNCHER_PATH = "/Hopper Path"\nGHIDRA_INSTALL_DIR = "/opt/ghidra"\n`,
     );
 
     const original = await readFile(configPath, "utf8");
@@ -161,7 +161,7 @@ describe("client configuration filesystem lifecycle", () => {
           GHIDRA_INSTALL_DIR: "/opt/ghidra",
           JAVA_HOME: "/opt/jdk-21",
         },
-        ["rea", "mcp"],
+        ["rea4re", "mcp"],
       ),
     ).toEqual({ status: "unchanged" });
     expect(await readFile(configPath, "utf8")).toBe(original);
@@ -185,7 +185,7 @@ describe("Codex MCP tool deadlines", () => {
           format: "toml",
         },
         { REA_GHIDRA_STARTUP_TIMEOUT_MS: "2700001" },
-        ["rea", "mcp"],
+        ["rea4re", "mcp"],
       ),
     ).toMatchObject({ status: "configured" });
     expect(await readFile(configPath, "utf8")).toContain(
@@ -202,7 +202,7 @@ describe("Codex MCP tool deadlines", () => {
     await mkdir(dirname(configPath), { recursive: true });
     await writeFile(
       configPath,
-      '[mcp_servers.rea]\ncommand = "npx"\nargs = ["-y", "rea-agents@6.1.0", "mcp"]\nstartup_timeout_sec = 5\ntool_timeout_sec = 10\n',
+      '[mcp_servers.rea]\ncommand = "npx"\nargs = ["-y", "rea4re@6.1.0", "mcp"]\nstartup_timeout_sec = 5\ntool_timeout_sec = 10\n',
     );
     expect(
       await configureClientConfiguration(
@@ -213,7 +213,7 @@ describe("Codex MCP tool deadlines", () => {
           format: "toml",
         },
         {},
-        ["rea", "mcp"],
+        ["rea4re", "mcp"],
       ),
     ).toMatchObject({ status: "configured" });
     const configured = await readFile(configPath, "utf8");
@@ -241,7 +241,7 @@ describe("client configuration filesystem lifecycle", () => {
           format: "toml",
         },
         undefined,
-        ["rea", "mcp"],
+        ["rea4re", "mcp"],
       ),
     ).toMatchObject({ status: "configured" });
     expect((await lstat(configPath)).isSymbolicLink()).toBe(true);
@@ -289,7 +289,7 @@ describe("Grok Build server table edits", () => {
       "# about rea",
       "[mcp_servers.rea]",
       'command = "npx"',
-      'args = ["-y", "rea-agents@6.1.0", "mcp"]',
+      'args = ["-y", "rea4re@6.1.0", "mcp"]',
       "",
       "# rea environment",
       "[mcp_servers.rea.env]",
@@ -320,7 +320,7 @@ describe("Grok Build server table edits", () => {
           format: "grok",
         },
         environment,
-        ["rea", "mcp"],
+        ["rea4re", "mcp"],
       ),
     ).toMatchObject({ status: "configured" });
     const configured = await readFile(configPath, "utf8");
@@ -345,12 +345,12 @@ describe("Grok Build server table edits", () => {
     expect(configured).toContain("[mcp_servers.rea]");
     expect(configured).toContain("startup_timeout_sec = 30");
     expect(configured).toContain('OLD = "1"');
-    expect(configured).not.toContain("rea-agents@6.1.0");
+    expect(configured).not.toContain("rea4re@6.1.0");
     expect(parseToml(configured)).toMatchObject({
       mcp_servers: {
         blender: { command: "blender", args: ["--mcp"] },
         rea: {
-          command: "rea",
+          command: "rea4re",
           args: ["mcp"],
           startup_timeout_sec: 30,
           env: {
@@ -373,7 +373,7 @@ describe("Grok Build server table edits", () => {
           format: "grok",
         },
         environment,
-        ["rea", "mcp"],
+        ["rea4re", "mcp"],
       ),
     ).toEqual({ status: "unchanged" });
     expect(await readFile(configPath, "utf8")).toBe(configured);
@@ -415,7 +415,7 @@ describe("Grok Build disabled server list", () => {
         "]",
         "[mcp_servers.rea]",
         "enabled = false",
-        'command = "rea"',
+        'command = "rea4re"',
         'args = ["mcp"]',
         "startup_timeout_sec = 30",
       ].join("\n"),
@@ -429,7 +429,7 @@ describe("Grok Build disabled server list", () => {
           format: "grok",
         },
         undefined,
-        ["rea", "mcp"],
+        ["rea4re", "mcp"],
       ),
     ).toMatchObject({ status: "configured" });
     const configured = await readFile(configPath, "utf8");
@@ -438,7 +438,7 @@ describe("Grok Build disabled server list", () => {
     expect(parseToml(configured)).toMatchObject({
       disabled_mcp_servers: ["other", "github"],
       mcp_servers: {
-        rea: { command: "rea", args: ["mcp"], startup_timeout_sec: 30 },
+        rea: { command: "rea4re", args: ["mcp"], startup_timeout_sec: 30 },
       },
     });
     expect(
@@ -450,7 +450,7 @@ describe("Grok Build disabled server list", () => {
           format: "grok",
         },
         undefined,
-        ["rea", "mcp"],
+        ["rea4re", "mcp"],
       ),
     ).toEqual({ status: "unchanged" });
     await writeFile(configPath, 'disabled_mcp_servers = ["rea"] # note\n');
@@ -463,14 +463,14 @@ describe("Grok Build disabled server list", () => {
           format: "grok",
         },
         undefined,
-        ["rea", "mcp"],
+        ["rea4re", "mcp"],
       ),
     ).toMatchObject({ status: "configured" });
     const created = await readFile(configPath, "utf8");
     expect(created).toContain("# note");
     expect(created).not.toContain("disabled_mcp_servers");
     expect(parseToml(created)).toMatchObject({
-      mcp_servers: { rea: { command: "rea", args: ["mcp"] } },
+      mcp_servers: { rea: { command: "rea4re", args: ["mcp"] } },
     });
   });
 
@@ -501,13 +501,13 @@ describe("Grok Build disabled server list", () => {
           format: "grok",
         },
         undefined,
-        ["rea", "mcp"],
+        ["rea4re", "mcp"],
       ),
     ).toMatchObject({ status: "configured" });
     const configured = await readFile(configPath, "utf8");
     expect(parseToml(configured)).toMatchObject({
       disabled_mcp_servers: ["rea\n", "github"],
-      mcp_servers: { rea: { command: "rea", args: ["mcp"] } },
+      mcp_servers: { rea: { command: "rea4re", args: ["mcp"] } },
     });
     await writeFile(configPath, 'disabled_mcp_servers = ["""rea"""] # note\n');
     expect(
@@ -519,7 +519,7 @@ describe("Grok Build disabled server list", () => {
           format: "grok",
         },
         undefined,
-        ["rea", "mcp"],
+        ["rea4re", "mcp"],
       ),
     ).toMatchObject({ status: "configured" });
     const created = await readFile(configPath, "utf8");
@@ -543,7 +543,7 @@ describe("Grok Build text that resembles a server table", () => {
       "",
       "[mcp_servers.rea]",
       'command = "npx"',
-      'args = ["-y", "rea-agents@6.1.0", "mcp"]',
+      'args = ["-y", "rea4re@6.1.0", "mcp"]',
       "",
       "# Production server: preserve this configuration",
       '[mcp_servers."rea.env"]',
@@ -568,7 +568,7 @@ describe("Grok Build text that resembles a server table", () => {
           format: "grok",
         },
         undefined,
-        ["rea", "mcp"],
+        ["rea4re", "mcp"],
       ),
     ).toMatchObject({ status: "configured" });
     const configured = await readFile(configPath, "utf8");
@@ -579,13 +579,13 @@ describe("Grok Build text that resembles a server table", () => {
     expect(configured).toContain('[mcp_servers."rea.env"]');
     expect(configured).toContain('[mcp_servers."other[prod]"]');
     expect(configured).toContain('[[marketplace."sources[prod]"]]');
-    expect(configured).not.toContain("rea-agents@6.1.0");
+    expect(configured).not.toContain("rea4re@6.1.0");
     expect(parseToml(configured)).toMatchObject({
       banner: "welcome\n[mcp_servers.rea]\nkeep this text\n[privacy]\n",
       mcp_servers: {
         "rea.env": { command: "other", args: ["serve"] },
         "other[prod]": { command: "other", args: ["serve"] },
-        rea: { command: "rea", args: ["mcp"], startup_timeout_sec: 30 },
+        rea: { command: "rea4re", args: ["mcp"], startup_timeout_sec: 30 },
       },
       marketplace: { "sources[prod]": [{ name: "official" }] },
     });
@@ -598,7 +598,7 @@ describe("Grok Build text that resembles a server table", () => {
           format: "grok",
         },
         undefined,
-        ["rea", "mcp"],
+        ["rea4re", "mcp"],
       ),
     ).toEqual({ status: "unchanged" });
 
@@ -629,7 +629,7 @@ describe("Grok Build text that resembles a server table", () => {
       [
         "[ mcp_servers . rea ]",
         'command = "npx"',
-        'args = ["-y", "rea-agents@6.1.0", "mcp"]',
+        'args = ["-y", "rea4re@6.1.0", "mcp"]',
         "",
         '[mcp_servers."\\u0072ea".env]',
         'OLD = "1"',
@@ -645,7 +645,7 @@ describe("Grok Build text that resembles a server table", () => {
           format: "grok",
         },
         undefined,
-        ["rea", "mcp"],
+        ["rea4re", "mcp"],
       ),
     ).toMatchObject({ status: "configured" });
     const configured = await readFile(configPath, "utf8");
@@ -660,7 +660,7 @@ describe("Grok Build text that resembles a server table", () => {
     expect(parseToml(configured)).toMatchObject({
       mcp_servers: {
         rea: {
-          command: "rea",
+          command: "rea4re",
           args: ["mcp"],
           startup_timeout_sec: 30,
           env: { OLD: "1" },
@@ -705,7 +705,7 @@ describe("Grok Build multiline and escaped headers", () => {
           format: "grok",
         },
         undefined,
-        ["rea", "mcp"],
+        ["rea4re", "mcp"],
       ),
     ).toMatchObject({ status: "configured" });
     const configured = await readFile(configPath, "utf8");
@@ -719,7 +719,7 @@ describe("Grok Build multiline and escaped headers", () => {
       ],
       marker: ["first\n", '[mcp_servers.rea]\ncommand = "keep literal"\n'],
       mcp_servers: {
-        rea: { command: "rea", args: ["mcp"], startup_timeout_sec: 30 },
+        rea: { command: "rea4re", args: ["mcp"], startup_timeout_sec: 30 },
       },
     });
     expect(
@@ -731,7 +731,7 @@ describe("Grok Build multiline and escaped headers", () => {
           format: "grok",
         },
         undefined,
-        ["rea", "mcp"],
+        ["rea4re", "mcp"],
       ),
     ).toEqual({ status: "unchanged" });
   });
@@ -742,7 +742,7 @@ describe("Grok Build multiline and escaped headers", () => {
     await mkdir(dirname(configPath), { recursive: true });
     const original = [
       '[mcp_servers."\\x72ea"]',
-      'command = "rea"',
+      'command = "rea4re"',
       'args = ["mcp"]',
       "",
       '[mcp_servers."rea\\x2Eenv"]',
@@ -772,7 +772,7 @@ describe("Grok Build multiline and escaped headers", () => {
           format: "grok",
         },
         undefined,
-        ["rea", "mcp"],
+        ["rea4re", "mcp"],
       ),
     ).toMatchObject({ status: "configured" });
     const configured = await readFile(configPath, "utf8");
@@ -786,7 +786,7 @@ describe("Grok Build multiline and escaped headers", () => {
     expect(parseToml(configured)).toMatchObject({
       mcp_servers: {
         "rea.env": { command: "other", args: ["serve"] },
-        rea: { command: "rea", args: ["mcp"], startup_timeout_sec: 30 },
+        rea: { command: "rea4re", args: ["mcp"], startup_timeout_sec: 30 },
       },
     });
   });
@@ -820,7 +820,7 @@ describe("Grok Build inline and dotted assignments", () => {
           format: "grok",
         },
         undefined,
-        ["rea", "mcp"],
+        ["rea4re", "mcp"],
       ),
     ).toMatchObject({ status: "failed", reason: "registration_ownership" });
     expect(await readFile(configPath, "utf8")).toBe(inline);
@@ -831,7 +831,7 @@ describe("Grok Build inline and dotted assignments", () => {
       configPath,
       [
         "[mcp_servers]",
-        'rea = { command = "npx", args = ["-y", "rea-agents@6.1.0", "mcp"] }',
+        'rea = { command = "npx", args = ["-y", "rea4re@6.1.0", "mcp"] }',
         'other = { command = "other" }',
         "",
         "# next table",
@@ -849,18 +849,18 @@ describe("Grok Build inline and dotted assignments", () => {
           format: "grok",
         },
         undefined,
-        ["rea", "mcp"],
+        ["rea4re", "mcp"],
       ),
     ).toMatchObject({ status: "configured" });
     const configuredInline = await readFile(configPath, "utf8");
-    expect(configuredInline).not.toContain("rea-agents@6.1.0");
+    expect(configuredInline).not.toContain("rea4re@6.1.0");
     expect(configuredInline).toContain('other = { command = "other" }');
     expect(configuredInline).toContain("# next table");
     expect(configuredInline).toContain("[privacy]");
     expect(parseToml(configuredInline)).toMatchObject({
       mcp_servers: {
         other: { command: "other" },
-        rea: { command: "rea", args: ["mcp"], startup_timeout_sec: 30 },
+        rea: { command: "rea4re", args: ["mcp"], startup_timeout_sec: 30 },
       },
       privacy: { share: false },
     });
@@ -874,7 +874,7 @@ describe("Grok Build inline and dotted assignments", () => {
           format: "grok",
         },
         undefined,
-        ["rea", "mcp"],
+        ["rea4re", "mcp"],
       ),
     ).toEqual({ status: "unchanged" });
     expect((await runUninstall(false, systemUninstallHost(home))).status).toBe(
@@ -886,7 +886,7 @@ describe("Grok Build inline and dotted assignments", () => {
     expect(parseToml(removedInline)).not.toHaveProperty("mcp_servers.rea");
 
     const dotted = [
-      'mcp_servers.rea = { command = "rea", args = ["mcp"] }',
+      'mcp_servers.rea = { command = "rea4re", args = ["mcp"] }',
       'mcp_servers.other.command = "other"',
       "",
       "# next table",
@@ -912,7 +912,7 @@ describe("Grok Build inline and dotted assignments", () => {
       [
         "[mcp_servers]",
         'rea.command = "npx"',
-        'rea.args = ["-y", "rea-agents@6.1.0", "mcp"]',
+        'rea.args = ["-y", "rea4re@6.1.0", "mcp"]',
         'other.command = "other"',
         "",
       ].join("\n"),
@@ -926,16 +926,16 @@ describe("Grok Build inline and dotted assignments", () => {
           format: "grok",
         },
         undefined,
-        ["rea", "mcp"],
+        ["rea4re", "mcp"],
       ),
     ).toMatchObject({ status: "configured" });
     const configuredDotted = await readFile(configPath, "utf8");
     expect(configuredDotted).toContain('other.command = "other"');
-    expect(configuredDotted).not.toContain("rea-agents@6.1.0");
+    expect(configuredDotted).not.toContain("rea4re@6.1.0");
     expect(parseToml(configuredDotted)).toMatchObject({
       mcp_servers: {
         other: { command: "other" },
-        rea: { command: "rea", args: ["mcp"], startup_timeout_sec: 30 },
+        rea: { command: "rea4re", args: ["mcp"], startup_timeout_sec: 30 },
       },
     });
   });
@@ -948,7 +948,7 @@ describe("Grok Build closed inline tables", () => {
     await mkdir(dirname(configPath), { recursive: true });
     const original = [
       "# preamble",
-      'mcp_servers = { other = { command = "other" }, "\\x72ea" = { command = "npx", args = ["-y", "rea-agents@6.1.0", "mcp"] } }',
+      'mcp_servers = { other = { command = "other" }, "\\x72ea" = { command = "npx", args = ["-y", "rea4re@6.1.0", "mcp"] } }',
       "",
       "# next table",
       "[privacy]",
@@ -965,7 +965,7 @@ describe("Grok Build closed inline tables", () => {
           format: "grok",
         },
         undefined,
-        ["rea", "mcp"],
+        ["rea4re", "mcp"],
       ),
     ).toMatchObject({ status: "configured" });
     const configured = await readFile(configPath, "utf8");
@@ -978,7 +978,7 @@ describe("Grok Build closed inline tables", () => {
     expect(parseToml(configured)).toMatchObject({
       mcp_servers: {
         other: { command: "other" },
-        rea: { command: "rea", args: ["mcp"], startup_timeout_sec: 30 },
+        rea: { command: "rea4re", args: ["mcp"], startup_timeout_sec: 30 },
       },
       privacy: { share: false },
     });
@@ -991,14 +991,14 @@ describe("Grok Build closed inline tables", () => {
           format: "grok",
         },
         undefined,
-        ["rea", "mcp"],
+        ["rea4re", "mcp"],
       ),
     ).toEqual({ status: "unchanged" });
 
     await writeFile(
       configPath,
       [
-        'mcp_servers = { other = { command = "other" }, rea = { command = "rea", args = ["mcp"] } }',
+        'mcp_servers = { other = { command = "other" }, rea = { command = "rea4re", args = ["mcp"] } }',
         "",
       ].join("\n"),
     );
@@ -1023,7 +1023,7 @@ describe("Grok Build closed inline tables", () => {
           format: "grok",
         },
         undefined,
-        ["rea", "mcp"],
+        ["rea4re", "mcp"],
       ),
     ).toMatchObject({ status: "configured" });
     const created = await readFile(configPath, "utf8");
@@ -1031,7 +1031,7 @@ describe("Grok Build closed inline tables", () => {
     expect(created).not.toMatch(/^\[mcp_servers\.rea\]$/mu);
     expect(parseToml(created)).toMatchObject({
       mcp_servers: {
-        rea: { command: "rea", args: ["mcp"], startup_timeout_sec: 30 },
+        rea: { command: "rea4re", args: ["mcp"], startup_timeout_sec: 30 },
       },
     });
   });
@@ -1046,7 +1046,7 @@ describe("Grok Build closed inline tables", () => {
         'banner = ["""keep""""]',
         "marker = ['''keep'''']",
         "[mcp_servers.rea]",
-        'command = "rea"',
+        'command = "rea4re"',
         'args = ["mcp"]',
         "",
       ].join("\n"),
@@ -1060,7 +1060,7 @@ describe("Grok Build closed inline tables", () => {
           format: "grok",
         },
         undefined,
-        ["rea", "mcp"],
+        ["rea4re", "mcp"],
       ),
     ).toMatchObject({ status: "configured" });
     const configured = await readFile(configPath, "utf8");
@@ -1068,7 +1068,7 @@ describe("Grok Build closed inline tables", () => {
       banner: ['keep"'],
       marker: ["keep'"],
       mcp_servers: {
-        rea: { command: "rea", args: ["mcp"], startup_timeout_sec: 30 },
+        rea: { command: "rea4re", args: ["mcp"], startup_timeout_sec: 30 },
       },
     });
     expect(
@@ -1089,7 +1089,7 @@ describe("Grok Build scalar and nested values", () => {
       [
         'banner = "\\e[31m"',
         "[mcp_servers.rea]",
-        'command = "rea"',
+        'command = "rea4re"',
         'args = ["mcp"]',
         "",
       ].join("\n"),
@@ -1103,7 +1103,7 @@ describe("Grok Build scalar and nested values", () => {
           format: "grok",
         },
         undefined,
-        ["rea", "mcp"],
+        ["rea4re", "mcp"],
       ),
     ).toMatchObject({ status: "configured" });
     const configured = await readFile(configPath, "utf8");
@@ -1111,7 +1111,7 @@ describe("Grok Build scalar and nested values", () => {
     expect(parseToml(configured)).toMatchObject({
       banner: "\u001b[31m",
       mcp_servers: {
-        rea: { command: "rea", args: ["mcp"], startup_timeout_sec: 30 },
+        rea: { command: "rea4re", args: ["mcp"], startup_timeout_sec: 30 },
       },
     });
   });
@@ -1122,7 +1122,7 @@ describe("Grok Build scalar and nested values", () => {
     await mkdir(dirname(configPath), { recursive: true });
     await writeFile(
       configPath,
-      'mcp_servers = { rea.command = "npx", rea.args = ["-y", "rea-agents@6.1.0", "mcp"], rea.startup_timeout_sec = 10 }\n',
+      'mcp_servers = { rea.command = "npx", rea.args = ["-y", "rea4re@6.1.0", "mcp"], rea.startup_timeout_sec = 10 }\n',
     );
     expect(
       await configureClientConfiguration(
@@ -1133,14 +1133,14 @@ describe("Grok Build scalar and nested values", () => {
           format: "grok",
         },
         undefined,
-        ["rea", "mcp"],
+        ["rea4re", "mcp"],
       ),
     ).toMatchObject({ status: "configured" });
     const configured = await readFile(configPath, "utf8");
     expect(configured).not.toMatch(/^\[mcp_servers\.rea\]$/mu);
     expect(parseToml(configured)).toMatchObject({
       mcp_servers: {
-        rea: { command: "rea", args: ["mcp"], startup_timeout_sec: 10 },
+        rea: { command: "rea4re", args: ["mcp"], startup_timeout_sec: 10 },
       },
     });
   });
@@ -1151,7 +1151,7 @@ describe("Grok Build scalar and nested values", () => {
     await mkdir(dirname(configPath), { recursive: true });
     const original = [
       "[mcp_servers.rea]",
-      'command = "rea"',
+      'command = "rea4re"',
       'args = ["mcp"]',
       "extra = [",
       "  [1, 2],",
@@ -1181,7 +1181,7 @@ describe("Grok Build scalar and nested values", () => {
           format: "grok",
         },
         undefined,
-        ["rea", "mcp"],
+        ["rea4re", "mcp"],
       ),
     ).toMatchObject({ status: "configured" });
     const configured = await readFile(configPath, "utf8");
@@ -1190,7 +1190,7 @@ describe("Grok Build scalar and nested values", () => {
     expect(parseToml(configured)).toMatchObject({
       privacy: { share: false },
       mcp_servers: {
-        rea: { command: "rea", args: ["mcp"], startup_timeout_sec: 30 },
+        rea: { command: "rea4re", args: ["mcp"], startup_timeout_sec: 30 },
       },
     });
   });
@@ -1214,7 +1214,7 @@ describe("Grok Build newlines and leading marks", () => {
           format: "grok",
         },
         undefined,
-        ["rea", "mcp"],
+        ["rea4re", "mcp"],
       ),
     ).toMatchObject({ status: "configured" });
     const configured = await readFile(configPath, "utf8");
@@ -1223,13 +1223,13 @@ describe("Grok Build newlines and leading marks", () => {
     expect(parseToml(configured)).toMatchObject({
       profile: { mcp_servers: { rea: "keep this setting" } },
       mcp_servers: {
-        rea: { command: "rea", args: ["mcp"], startup_timeout_sec: 30 },
+        rea: { command: "rea4re", args: ["mcp"], startup_timeout_sec: 30 },
       },
     });
 
     await writeFile(
       configPath,
-      '\uFEFF[mcp_servers.rea]\ncommand = "rea"\nargs = ["mcp"]\n',
+      '\uFEFF[mcp_servers.rea]\ncommand = "rea4re"\nargs = ["mcp"]\n',
     );
     expect((await runUninstall(false, systemUninstallHost(home))).status).toBe(
       "complete",
@@ -1244,7 +1244,7 @@ describe("Grok Build newlines and leading marks", () => {
     const configPath = join(home, ".grok/config.toml");
     await mkdir(dirname(configPath), { recursive: true });
     const original =
-      'banner = """a\r\nb"""\n[mcp_servers.rea]\ncommand = "rea"\nargs = ["mcp"]\n';
+      'banner = """a\r\nb"""\n[mcp_servers.rea]\ncommand = "rea4re"\nargs = ["mcp"]\n';
     await writeFile(configPath, original);
     expect(
       await configureClientConfiguration(
@@ -1255,13 +1255,13 @@ describe("Grok Build newlines and leading marks", () => {
           format: "grok",
         },
         undefined,
-        ["rea", "mcp"],
+        ["rea4re", "mcp"],
       ),
     ).toMatchObject({ status: "configured" });
     expect(parseToml(await readFile(configPath, "utf8"))).toMatchObject({
       banner: "a\r\nb",
       mcp_servers: {
-        rea: { command: "rea", args: ["mcp"], startup_timeout_sec: 30 },
+        rea: { command: "rea4re", args: ["mcp"], startup_timeout_sec: 30 },
       },
     });
 
@@ -1280,7 +1280,7 @@ describe("Grok Build newlines and leading marks", () => {
     await mkdir(dirname(configPath), { recursive: true });
     await writeFile(
       configPath,
-      'banner = """keep\nthis LF"""\n[mcp_servers.rea]\r\ncommand = "rea"\r\nargs = ["mcp"]\r\n',
+      'banner = """keep\nthis LF"""\n[mcp_servers.rea]\r\ncommand = "rea4re"\r\nargs = ["mcp"]\r\n',
     );
     expect(
       await configureClientConfiguration(
@@ -1291,13 +1291,13 @@ describe("Grok Build newlines and leading marks", () => {
           format: "grok",
         },
         undefined,
-        ["rea", "mcp"],
+        ["rea4re", "mcp"],
       ),
     ).toMatchObject({ status: "configured" });
     expect(parseToml(await readFile(configPath, "utf8"))).toMatchObject({
       banner: "keep\nthis LF",
       mcp_servers: {
-        rea: { command: "rea", args: ["mcp"], startup_timeout_sec: 30 },
+        rea: { command: "rea4re", args: ["mcp"], startup_timeout_sec: 30 },
       },
     });
   });
@@ -1310,7 +1310,7 @@ describe("Grok Build inline comments", () => {
     await mkdir(dirname(configPath), { recursive: true });
     const original = [
       'mcp_servers = { other = {command="other"}, # keep other note',
-      '  rea.command = "rea", # command note',
+      '  rea.command = "rea4re", # command note',
       '  rea.args = ["mcp"] }',
       "",
     ].join("\n");
@@ -1324,7 +1324,7 @@ describe("Grok Build inline comments", () => {
           format: "grok",
         },
         undefined,
-        ["rea", "mcp"],
+        ["rea4re", "mcp"],
       ),
     ).toMatchObject({ status: "configured" });
     const configured = await readFile(configPath, "utf8");
@@ -1333,7 +1333,7 @@ describe("Grok Build inline comments", () => {
     expect(parseToml(configured)).toMatchObject({
       mcp_servers: {
         other: { command: "other" },
-        rea: { command: "rea", args: ["mcp"], startup_timeout_sec: 30 },
+        rea: { command: "rea4re", args: ["mcp"], startup_timeout_sec: 30 },
       },
     });
 
@@ -1355,7 +1355,7 @@ describe("Grok Build inline comments", () => {
     const configPath = join(home, ".grok/config.toml");
     await mkdir(dirname(configPath), { recursive: true });
     const original =
-      'mcp_servers = { other = {command="other"}, # important other-server note\n  rea = {command="rea",args=["mcp"]} }\n';
+      'mcp_servers = { other = {command="other"}, # important other-server note\n  rea = {command="rea4re",args=["mcp"]} }\n';
     await writeFile(configPath, original);
     expect(
       await configureClientConfiguration(
@@ -1366,7 +1366,7 @@ describe("Grok Build inline comments", () => {
           format: "grok",
         },
         undefined,
-        ["rea", "mcp"],
+        ["rea4re", "mcp"],
       ),
     ).toMatchObject({ status: "configured" });
     const configured = await readFile(configPath, "utf8");
@@ -1374,7 +1374,7 @@ describe("Grok Build inline comments", () => {
     expect(parseToml(configured)).toMatchObject({
       mcp_servers: {
         other: { command: "other" },
-        rea: { command: "rea", args: ["mcp"], startup_timeout_sec: 30 },
+        rea: { command: "rea4re", args: ["mcp"], startup_timeout_sec: 30 },
       },
     });
 
@@ -1396,7 +1396,7 @@ describe("Grok Build inline comments", () => {
     await mkdir(dirname(configPath), { recursive: true });
     await writeFile(
       configPath,
-      'mcp_servers = { rea = {command="rea",args=["mcp"]}, # other: one, two\n  other = {command="other"} }\n',
+      'mcp_servers = { rea = {command="rea4re",args=["mcp"]}, # other: one, two\n  other = {command="other"} }\n',
     );
     expect(
       await configureClientConfiguration(
@@ -1407,7 +1407,7 @@ describe("Grok Build inline comments", () => {
           format: "grok",
         },
         { HOPPER_LAUNCHER_PATH: "/tmp/path\u007fwith-del" },
-        ["rea", "mcp"],
+        ["rea4re", "mcp"],
       ),
     ).toMatchObject({ status: "configured" });
     const configured = await readFile(configPath, "utf8");
@@ -1416,7 +1416,7 @@ describe("Grok Build inline comments", () => {
       mcp_servers: {
         other: { command: "other" },
         rea: {
-          command: "rea",
+          command: "rea4re",
           args: ["mcp"],
           startup_timeout_sec: 30,
           env: { HOPPER_LAUNCHER_PATH: "/tmp/path\u007fwith-del" },
@@ -1431,7 +1431,7 @@ describe("Grok Build inline comments", () => {
     await mkdir(dirname(configPath), { recursive: true });
     await writeFile(
       configPath,
-      'mcp_servers = { # policy\n  rea = { command = "rea", args = ["mcp"] } # owned\n}\n',
+      'mcp_servers = { # policy\n  rea = { command = "rea4re", args = ["mcp"] } # owned\n}\n',
     );
     expect((await runUninstall(false, systemUninstallHost(home))).status).toBe(
       "complete",
@@ -1450,7 +1450,7 @@ describe("JSON client configuration comments", () => {
     await mkdir(dirname(configPath), { recursive: true });
     await writeFile(
       configPath,
-      '{\n  "mcpServers": {\n    "other": {"command":"other"}, // important other-server note\n    "rea": {"command":"rea","args":["mcp"]}\n  }\n}\n',
+      '{\n  "mcpServers": {\n    "other": {"command":"other"}, // important other-server note\n    "rea": {"command":"rea4re","args":["mcp"]}\n  }\n}\n',
     );
     expect((await runUninstall(false, systemUninstallHost(home))).status).toBe(
       "complete",
@@ -1471,7 +1471,7 @@ describe("JSON client configuration comments", () => {
     await mkdir(dirname(configPath), { recursive: true });
     await writeFile(
       configPath,
-      '{"mcpServers":{\n  "other":{"command":"other"}, // keep other note\n  "rea":{"command":"rea","args":["mcp"]} /**/,\n  "keep":{"command":"keep"}\n}}\n',
+      '{"mcpServers":{\n  "other":{"command":"other"}, // keep other note\n  "rea":{"command":"rea4re","args":["mcp"]} /**/,\n  "keep":{"command":"keep"}\n}}\n',
     );
     expect((await runUninstall(false, systemUninstallHost(home))).status).toBe(
       "complete",
@@ -1494,8 +1494,8 @@ describe("JSON client configuration comments", () => {
     const configPath = join(home, ".cursor/mcp.json");
     await mkdir(dirname(configPath), { recursive: true });
     const files = [
-      '{\n  "mcpServers": {\n    "other": {"command":"other"}, // important other-server note\n    "rea": {"command":"rea","args":["mcp"]}, "keep": {"command":"keep"}\n  }\n}\n',
-      '{\n  "mcpServers": {\n    "other": {"command":"other"}, // important other-server note\n    "rea": {"command":"rea","args":["mcp"]}}}\n',
+      '{\n  "mcpServers": {\n    "other": {"command":"other"}, // important other-server note\n    "rea": {"command":"rea4re","args":["mcp"]}, "keep": {"command":"keep"}\n  }\n}\n',
+      '{\n  "mcpServers": {\n    "other": {"command":"other"}, // important other-server note\n    "rea": {"command":"rea4re","args":["mcp"]}}}\n',
     ];
     for (const original of files) {
       await writeFile(configPath, original);
@@ -1527,7 +1527,7 @@ describe("Grok Bot registration", () => {
     const configPath = join(directory, "mcp.json");
     await mkdir(directory, { recursive: true });
     const original =
-      '{"mcpServers":{"other":{"command":"other"},"rea":{"command":"rea","args":["mcp"]}}}\n';
+      '{"mcpServers":{"other":{"command":"other"},"rea":{"command":"rea4re","args":["mcp"]}}}\n';
     await writeFile(configPath, original);
     const client = supportedClients(home).find(
       ({ name }) => name === "grok_bot",
@@ -1536,7 +1536,7 @@ describe("Grok Bot registration", () => {
     expect(client.format).toBe("unsupported");
     expect(client.configPath).toBe(directory);
     expect(
-      await systemSetupHost().configureClient(client, {}, ["rea", "mcp"]),
+      await systemSetupHost().configureClient(client, {}, ["rea4re", "mcp"]),
     ).toEqual({ status: "skipped" });
     expect(await readFile(configPath, "utf8")).toBe(original);
     expect(
@@ -1841,7 +1841,7 @@ describe("uninstall configuration symlink ownership", () => {
     const targetPath = join(home, "managed-mcp.json");
     const original = JSON.stringify({
       mcpServers: {
-        rea: { command: "rea", args: ["mcp"] },
+        rea: { command: "rea4re", args: ["mcp"] },
         other: { command: "other" },
       },
     });
@@ -2145,7 +2145,7 @@ describe("uninstall configuration preflight", () => {
     ];
     const cursorConfig = JSON.stringify({
       mcpServers: {
-        rea: { command: "npx", args: ["-y", "rea-agents@6.1.0", "mcp"] },
+        rea: { command: "npx", args: ["-y", "rea4re@6.1.0", "mcp"] },
         other: { command: "echo", args: ["hello"] },
       },
     });
@@ -2237,13 +2237,13 @@ describe("client configuration changed during uninstall", () => {
       ".agents/skills/reverse-engineer-anything/SKILL.md",
     );
     const cursorConfig = JSON.stringify({
-      mcpServers: { rea: { command: "rea", args: ["mcp"] } },
+      mcpServers: { rea: { command: "rea4re", args: ["mcp"] } },
     });
     for (const path of [codex, cursor, skill])
       await mkdir(dirname(path), { recursive: true });
     await writeFile(
       codex,
-      '[mcp_servers.rea]\ncommand = "rea"\nargs = ["mcp"]\n',
+      '[mcp_servers.rea]\ncommand = "rea4re"\nargs = ["mcp"]\n',
     );
     await writeFile(cursor, cursorConfig);
     await writeFile(skill, "managed");
@@ -2501,7 +2501,9 @@ const uninstallFixture = async (): Promise<{
   await mkdir(dirname(config), { recursive: true });
   await writeFile(
     config,
-    JSON.stringify({ mcpServers: { rea: { command: "rea", args: ["mcp"] } } }),
+    JSON.stringify({
+      mcpServers: { rea: { command: "rea4re", args: ["mcp"] } },
+    }),
   );
   return { home, config };
 };

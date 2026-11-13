@@ -26,7 +26,6 @@
   "ignoreDependencies": [
     "@stryker-mutator/command-runner",
     "electron",
-    "esbuild",
     "webpack"
   ],
   "ignoreExportsUsedInFile": true,

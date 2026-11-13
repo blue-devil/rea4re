@@ -14,22 +14,3 @@ const macosVersionComponents = (
 export const macosMajorVersion = (
   version: string | undefined,
 ): number | undefined => macosVersionComponents(version)?.[0];
-
-/**
- * Whether a host version meets a declared minimum, comparing every component
- * numerically with absent trailing components as zero (`12` equals `12.0`).
- * Unknown when either value is not a complete dotted numeric version.
- */
-export const macosVersionMeetsMinimum = (
-  hostVersion: string | undefined,
-  minimumVersion: string,
-): boolean | undefined => {
-  const host = macosVersionComponents(hostVersion);
-  const minimum = macosVersionComponents(minimumVersion);
-  if (host === undefined || minimum === undefined) return undefined;
-  for (let index = 0; index < Math.max(host.length, minimum.length); index++) {
-    const difference = (host[index] ?? 0) - (minimum[index] ?? 0);
-    if (difference !== 0) return difference > 0;
-  }
-  return true;
-};

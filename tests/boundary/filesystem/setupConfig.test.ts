@@ -415,7 +415,7 @@ describe("JSON client configuration migration and provider paths", () => {
     const directory = await createTestTempDirectory("rea-setup-");
     const configPath = join(directory, "mcp.json");
     const original =
-      '{"theme":"dark","mcpServers":{"rea":{"command":"npx","args":["-y","rea-agents","mcp"]},"other":{"command":"other"}}}\n';
+      '{"theme":"dark","mcpServers":{"rea":{"command":"npx","args":["-y","rea4re","mcp"]},"other":{"command":"other"}}}\n';
     await writeFile(configPath, original);
 
     expect(
@@ -588,13 +588,13 @@ describe("JSON client configuration shape diagnostics", () => {
     {
       format: "json" as const,
       original:
-        '{"__proto__":{"mcpServers":{"rea":{"command":"rea","args":["mcp"]}}}}',
+        '{"__proto__":{"mcpServers":{"rea":{"command":"rea4re","args":["mcp"]}}}}',
       serversKey: "mcpServers",
     },
     {
       format: "opencode" as const,
       original:
-        '{"mcp":{"__proto__":{"servers":{"rea":{"type":"local","command":["rea","mcp"]}}}}}',
+        '{"mcp":{"__proto__":{"servers":{"rea":{"type":"local","command":["rea4re","mcp"]}}}}}',
       serversKey: "mcp",
     },
   ])(
@@ -612,16 +612,16 @@ describe("JSON client configuration shape diagnostics", () => {
       };
       await writeFile(configPath, original);
       expect(
-        await inspectClientConfiguration(client, {}, ["rea", "mcp"]),
+        await inspectClientConfiguration(client, {}, ["rea4re", "mcp"]),
       ).toMatchObject({ status: "update" });
       expect(
-        await configureClientConfiguration(client, {}, ["rea", "mcp"]),
+        await configureClientConfiguration(client, {}, ["rea4re", "mcp"]),
       ).toMatchObject({ status: "configured" });
       const document = JSON.parse(await readFile(configPath, "utf8"));
       expect(Object.hasOwn(document, serversKey)).toBe(true);
       expect(Object.hasOwn(document[serversKey], "rea")).toBe(true);
       expect(document[serversKey].rea.command).toEqual(
-        format === "json" ? "rea" : ["rea", "mcp"],
+        format === "json" ? "rea4re" : ["rea4re", "mcp"],
       );
       const originalDocument = JSON.parse(original);
       expect(
@@ -633,7 +633,7 @@ describe("JSON client configuration shape diagnostics", () => {
       );
       expect(await readFile(`${configPath}.rea.backup`, "utf8")).toBe(original);
       expect(
-        await inspectClientConfiguration(client, {}, ["rea", "mcp"]),
+        await inspectClientConfiguration(client, {}, ["rea4re", "mcp"]),
       ).toMatchObject({ status: "already_current" });
     },
   );
@@ -661,7 +661,7 @@ describe("JSON client configuration shape diagnostics", () => {
       expect(read.error.detail).toContain(problem);
       expect(read.error.detail).toContain("object");
       expect(
-        await inspectClientConfiguration(client, {}, ["rea", "mcp"]),
+        await inspectClientConfiguration(client, {}, ["rea4re", "mcp"]),
       ).toEqual({
         status: "invalid",
         remediation: read.error.detail,
@@ -771,7 +771,8 @@ it("keeps setup and registration diagnostics blocked for an unrecognized Claude 
     "claude_desktop_config.json",
   );
   await mkdir(join(environment.APPDATA, "Claude"), { recursive: true });
-  const original = '{"mcpServers":{"rea":{"command":"rea","args":["mcp"]}}}\n';
+  const original =
+    '{"mcpServers":{"rea":{"command":"rea4re","args":["mcp"]}}}\n';
   await writeFile(config, original);
   const client = supportedClients(home, "win32", environment).find(
     (client) => client.name === "claude_desktop",

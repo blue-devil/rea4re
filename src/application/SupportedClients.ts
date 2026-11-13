@@ -18,6 +18,7 @@ import {
   type MsixPackageView,
   windowsAppDataRoots,
 } from "./MsixPackageStorage.js";
+import { PRODUCT_IDENTITY } from "../identity.js";
 
 /** One supported client configuration location. */
 export interface SetupClient {
@@ -304,8 +305,7 @@ const grokBotDirectory = ({ home, env }: ClientPathContext): string => {
  * Grok Bot stores connectors in the signed-in account and runs them on its
  * hosted computer. The data directory is only a detection marker.
  */
-export const GROK_BOT_MANUAL_REGISTRATION_REMEDIATION =
-  "Grok Bot keeps connectors in the signed-in account and runs them on its hosted computer. Setup does not write that account store, and a data-directory mcp.json is not a registration. In the Grok Bot chat, add a custom MCP server named rea that runs on the Bot's computer with `npx -y rea-agents@<version> mcp`. Do not put credentials in the command or arguments. A stdio server on this machine is not attached.";
+export const GROK_BOT_MANUAL_REGISTRATION_REMEDIATION = `Grok Bot keeps connectors in the signed-in account and runs them on its hosted computer. Setup does not write that account store, and a data-directory mcp.json is not a registration. In the Grok Bot chat, add a custom MCP server named ${PRODUCT_IDENTITY.mcpServerKey} that runs on the Bot's computer with \`npx -y ${PRODUCT_IDENTITY.packageName}@<version> mcp\`. Do not put credentials in the command or arguments. A stdio server on this machine is not attached.`;
 
 /** Remediation for a client whose connector is not a local configuration file. */
 export const manualRegistrationRemediation = (

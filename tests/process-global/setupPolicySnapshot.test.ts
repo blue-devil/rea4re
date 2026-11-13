@@ -66,16 +66,16 @@ it.each(["inspect", "configure"] as const)(
     refresh.afterDiscovery = () => writeFile(configPath, repaired);
     if (operation === "inspect") {
       expect(
-        await inspectClientConfiguration(client, {}, ["rea", "mcp"]),
+        await inspectClientConfiguration(client, {}, ["rea4re", "mcp"]),
       ).toMatchObject({ status: "update" });
       expect(await readFile(configPath, "utf8")).toBe(repaired);
     } else {
       expect(
-        await configureClientConfiguration(client, {}, ["rea", "mcp"]),
+        await configureClientConfiguration(client, {}, ["rea4re", "mcp"]),
       ).toMatchObject({ status: "configured" });
       expect(JSON.parse(await readFile(configPath, "utf8"))).toMatchObject({
         caller_setting: true,
-        mcpServers: { rea: { command: "rea", args: ["mcp"] } },
+        mcpServers: { rea: { command: "rea4re", args: ["mcp"] } },
       });
       expect(await readFile(`${configPath}.rea.backup`, "utf8")).toBe(repaired);
     }
@@ -94,13 +94,13 @@ it("rechecks registration ownership after preflight before creating any backup",
   };
   await writeFile(
     configPath,
-    '{"mcpServers":{"rea":{"command":"rea","args":["mcp"]}}}',
+    '{"mcpServers":{"rea":{"command":"rea4re","args":["mcp"]}}}',
   );
   expect(
     await inspectClientConfiguration(client, {}, [
       "npx",
       "-y",
-      "rea-agents@6.8.0",
+      "rea4re@6.8.0",
       "mcp",
     ]),
   ).toMatchObject({ status: "update" });
@@ -109,7 +109,7 @@ it("rechecks registration ownership after preflight before creating any backup",
   // Change after layered discovery, so only the transaction's physical snapshot sees it.
   refresh.afterDiscovery = () => writeFile(configPath, replacement);
   expect(
-    await configureClientConfiguration(client, {}, ["rea", "mcp"]),
+    await configureClientConfiguration(client, {}, ["rea4re", "mcp"]),
   ).toMatchObject({
     status: "failed",
     reason: "registration_ownership",
@@ -137,7 +137,7 @@ it("blocks an inherited foreign row before planning creation of a missing write 
     configPaths: [lower, configPath],
   };
   expect(
-    await inspectClientConfiguration(client, {}, ["rea", "mcp"]),
+    await inspectClientConfiguration(client, {}, ["rea4re", "mcp"]),
   ).toMatchObject({
     status: "invalid",
     remediation: expect.stringContaining("foreign ownership"),
@@ -148,7 +148,7 @@ it("blocks an inherited foreign row before planning creation of a missing write 
   });
 });
 
-it.each(["other", "rea"])(
+it.each(["other", "rea4re"])(
   "rechecks an inherited %s launcher after preflight for a policy fragment",
   async (command) => {
     const home = await createTestTempDirectory("rea-setup-layer-recheck-");
@@ -163,12 +163,12 @@ it.each(["other", "rea"])(
     };
     await writeFile(
       lower,
-      '{"mcp":{"rea":{"type":"local","command":["rea","mcp"]}}}',
+      '{"mcp":{"rea":{"type":"local","command":["rea4re","mcp"]}}}',
     );
     const original = '{"mcp":{"rea":{"environment":{"CUSTOM":"keep"}}}}';
     await writeFile(configPath, original);
     expect(
-      await inspectClientConfiguration(client, {}, ["rea", "mcp"]),
+      await inspectClientConfiguration(client, {}, ["rea4re", "mcp"]),
     ).toMatchObject({ status: "update" });
     // The write transaction must use a fresh source discovery after preflight.
     await writeFile(
@@ -178,7 +178,7 @@ it.each(["other", "rea"])(
       }),
     );
     const result = await configureClientConfiguration(client, {}, [
-      "rea",
+      "rea4re",
       "mcp",
     ]);
     if (command === "other") {

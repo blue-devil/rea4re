@@ -540,7 +540,10 @@ const registrationAligned = ({
   if (compactInputSchemaByDefault(client) && !inputSchemaProfileSelected)
     return "stale";
   // Native transport is admitted separately; the Harness route must name REA.
-  if (client.format === "dsh" && registration.serverName !== "rea")
+  if (
+    client.format === "dsh" &&
+    registration.serverName !== PRODUCT_IDENTITY.mcpServerKey
+  )
     return "stale";
   // Legacy package runners remain owned, but setup migrates them to the selected installation.
   if (commandFacts.package !== undefined) return "stale";

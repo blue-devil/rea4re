@@ -68,6 +68,27 @@ Setup registers REA with your agent and installs matching workflow instructions.
 
 > **[Visit the REA website](https://rea.tools/)** for setup instructions, illustrated guides, and real case studies.
 
+## The rea4re paradigm
+
+rea4re's strategy is fixed: decompile (or disassemble when needed) first,
+understand the workflow behind the code, collide that comprehension with
+observed behavior, and rebuild — create new software from the collided
+understanding. The paradigm is target-agnostic: every lane — managed .NET via
+ILSpy-MCP, native binaries via provider pseudo-code, JavaScript via recovered
+sources, Android via jadx, and the rest — feeds one shared comprehension
+contract.
+
+Pillar 1 is decompilation-first analysis, worked here by managed .NET: REA
+decompiles selected members against its own metadata inventory and returns
+hash-locked reconstruction Evidence with
+`rea4re decompile-managed-members /absolute/path/Assembly.dll Namespace.Type --json`.
+See `docs/providers/ilspy-mcp.md` for the ILSpy-MCP guide. The later pillars
+are upcoming, one spec each: pillar 2, workflow comprehension — a lane-neutral
+machine-readable comprehension record written from decompilation; pillar 3,
+behavior collision — comprehension claims checked against capture Evidence;
+pillar 4, collide-and-create — verified reconstruction and generated source
+driven by the collided comprehension.
+
 ## Quick start
 
 On Linux, Ghidra, JADX, firmware tool launches and static JavaScript/Electron

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PRODUCT_IDENTITY } from "../identity.js";
 import { processArgumentSchema } from "../domain/process/processArgument.js";
 
 /** REA-owned registration options; commands are launch data, never helper acquisition. */
@@ -61,7 +62,7 @@ const clientOutcomeSchema = z.discriminatedUnion("status", [
 ]);
 /** Exact selected argv and every selected client's completion, including partial work. */
 export const mcpRegistrationReportSchema = z.object({
-  name: z.literal("rea"),
+  name: z.literal(PRODUCT_IDENTITY.mcpServerKey),
   command: z.string().min(1),
   args: z.array(z.string()),
   ok: z.boolean(),

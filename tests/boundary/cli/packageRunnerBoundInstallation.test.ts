@@ -57,7 +57,7 @@ cliTest.skipIf(process.platform === "win32")(
         "--yes",
         `--package=file:${resolve(".")}`,
         "--",
-        "rea",
+        "rea4re",
         "setup",
         "--client",
         "omp",
@@ -180,7 +180,7 @@ cliTest.skipIf(process.platform === "win32")(
     const home = await createTestTempDirectory("rea-amp-command-");
     const bin = join(home, `bin 'quoted' "double"`);
     await mkdir(bin);
-    const alias = join(bin, "rea");
+    const alias = join(bin, "rea4re");
     await symlink(resolve("scripts/rea.mjs"), alias);
     const result = await processes.run(
       process.execPath,

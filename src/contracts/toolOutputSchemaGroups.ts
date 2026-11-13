@@ -86,6 +86,7 @@ import {
 import { managedMemberComparisonResultSchema } from "../domain/managed/managedMemberComparison.js";
 import { managedNativeVerificationResultSchema } from "../domain/managed/managedNativeVerificationSchemas.js";
 import { managedReconstructionImportResultSchema } from "../domain/managed/managedReconstruction.js";
+import { managedDecompilationResultSchema } from "../domain/managed/managedDecompilation.js";
 import { managedApplicationGraphResultSchema } from "../domain/managed/managedApplicationGraph.js";
 import { artifactComparisonResultSchema } from "../domain/artifactComparison.js";
 import { functionComparisonResultSchema } from "../domain/functionComparisonSchemas.js";
@@ -464,6 +465,7 @@ export const managedOutputSchemas = {
   inspect_managed_native_boundaries: evidenceResultOf(
     managedNativeBoundaryInspectionSchema,
   ),
+  decompile_managed_members: evidenceResultOf(managedDecompilationResultSchema),
 } as const satisfies Readonly<Record<string, z.ZodObject>>;
 
 /** Exact Evidence schema for provider-neutral managed workflows. */

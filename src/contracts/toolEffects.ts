@@ -44,6 +44,10 @@ const effects = (overrides: Partial<ToolEffects> = {}): ToolEffects => ({
 });
 
 const evidence = effects({ mutatesSession: true });
+const evidenceWithProcess = effects({
+  mutatesSession: true,
+  launchesProcess: true,
+});
 const nativeEvidence = effects({ mutatesSession: true, launchesProcess: true });
 const browserEvidence = effects({
   mutatesSession: true,
@@ -686,6 +690,7 @@ const TOOL_EFFECT_AUDIT: Readonly<Record<string, EffectAudit>> = {
   inspect_managed_artifact: evidence,
   inspect_managed_members: evidence,
   inspect_managed_native_boundaries: evidence,
+  decompile_managed_members: evidenceWithProcess,
   compare_managed_members: evidence,
   verify_managed_native_boundaries: evidence,
   import_managed_reconstruction: evidence,

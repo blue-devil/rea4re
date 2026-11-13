@@ -180,7 +180,7 @@ describe("ZCode .agents fallback preservation", () => {
             mcpServers: {
               other: { command: "other-server", env: { TOKEN: "x" } },
               rea: {
-                command: "rea",
+                command: "rea4re",
                 args: ["mcp"],
                 env: {
                   REA_MCP_INPUT_SCHEMA_PROFILE: "compact",
@@ -426,7 +426,7 @@ describe("ZCode fallback admission", () => {
       const { home, client } = await zcodeClient();
       await mkdir(join(home, ".agents"), { recursive: true });
       const original = JSON.stringify({
-        mcpServers: { rea: { command: "rea", args: ["mcp"], env } },
+        mcpServers: { rea: { command: "rea4re", args: ["mcp"], env } },
       });
       await writeFile(fallbackPath(home), original);
       expect(

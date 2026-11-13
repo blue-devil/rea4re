@@ -29,7 +29,11 @@ export const createDirectAnalysis = (
     },
     createManagedBinarySession: async () => {
       const { createManagedBinarySession } = await import("./binary.js");
-      return createManagedBinarySession();
+      return createManagedBinarySession(
+        environment.REA_ILSPY_MCP_CONFIG === undefined
+          ? {}
+          : { ilspyMcpConfigPath: environment.REA_ILSPY_MCP_CONFIG },
+      );
     },
     createNativeDispatchBinarySession: async (config, logger) => {
       const { createNativeDispatchBinarySession } = await import("./binary.js");
@@ -85,7 +89,11 @@ export const runManagedProviderExecution: BoundOperation<
     {
       createManagedBinarySession: async () => {
         const { createManagedBinarySession } = await import("./binary.js");
-        return createManagedBinarySession();
+        return createManagedBinarySession(
+          process.env.REA_ILSPY_MCP_CONFIG === undefined
+            ? {}
+            : { ilspyMcpConfigPath: process.env.REA_ILSPY_MCP_CONFIG },
+        );
       },
     },
     ...args,

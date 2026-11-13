@@ -461,7 +461,7 @@ for (const scenario of scenarios)
       const registration = (env: Readonly<Record<string, string>>) => {
         const server = {
           command: "npx",
-          args: ["-y", "rea-agents@6.6.0", "mcp"],
+          args: ["-y", "rea4re@6.6.0", "mcp"],
           env: {
             CALLER_SETTING: "keep exactly",
             ["__proto__"]: "retain caller key",

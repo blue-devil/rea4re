@@ -218,7 +218,7 @@ describe("client registration launcher identity", () => {
     await mkdir(join(home, ".codex"));
     await writeFile(
       join(home, ".codex/config.toml"),
-      '[mcp_servers.rea]\ncommand = "npx"\nargs = ["-y", "rea-agents", "mcp"]\n',
+      '[mcp_servers.rea]\ncommand = "npx"\nargs = ["-y", "rea4re", "mcp"]\n',
     );
 
     const statuses = await readClientRegistrationStatuses(home);
@@ -226,7 +226,7 @@ describe("client registration launcher identity", () => {
     expect(statuses).toEqual([
       expect.objectContaining({
         client: "codex",
-        command: ["npx", "-y", "rea-agents", "mcp"],
+        command: ["npx", "-y", "rea4re", "mcp"],
         state: "stale",
       }),
     ]);
@@ -238,7 +238,7 @@ describe("client registration launcher identity", () => {
       join(home, ".claude.json"),
       JSON.stringify({
         mcpServers: {
-          rea: { command: "bunx", args: ["rea-agents", "mcp"] },
+          rea: { command: "bunx", args: ["rea4re", "mcp"] },
         },
       }),
     );
@@ -247,7 +247,7 @@ describe("client registration launcher identity", () => {
 
     expect(status).toMatchObject({
       client: "claude_code",
-      command: ["bunx", "rea-agents", "mcp"],
+      command: ["bunx", "rea4re", "mcp"],
       state: "stale",
     });
   });
@@ -341,7 +341,7 @@ describe("client registration package version identity", () => {
         "rea-registration-version-drift-",
       );
       await mkdir(join(home, ".codex"));
-      const reference = `rea-agents@${version}`;
+      const reference = `rea4re@${version}`;
       const command = ["npx", "-y", reference, "mcp"];
       await writeFile(
         join(home, ".codex/config.toml"),
@@ -790,7 +790,7 @@ it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
     await writeFile(
       target,
       JSON.stringify({
-        mcpServers: { rea: { command: "rea", args: ["mcp"] } },
+        mcpServers: { rea: { command: "rea4re", args: ["mcp"] } },
       }),
     );
     const path = join(home, ".claude.json");

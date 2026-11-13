@@ -48,6 +48,10 @@ type ManagedReconstructionMethodInput = z.infer<
   typeof managedReconstructionMethodInputSchema
 >;
 
+/** Reconstruction payload one decompiled member contributes. */
+export const managedReconstructionObjectSchema =
+  managedReconstructionMethodInputSchema.shape.reconstruction;
+
 const managedReconstructionImportRequestShape = {
   decompiler: decompilerSchema,
   methods: z.array(managedReconstructionMethodInputSchema).min(1),

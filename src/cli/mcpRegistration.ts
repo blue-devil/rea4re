@@ -388,7 +388,7 @@ const presentRegistration = async (
 ): Promise<void> => {
   const clients = outcomes.map(clientReport);
   const report: McpRegistrationReport = {
-    name: "rea",
+    name: PRODUCT_IDENTITY.mcpServerKey,
     command: launcher.command,
     args: [...launcher.args],
     ok: clients.every(

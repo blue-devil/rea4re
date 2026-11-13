@@ -144,10 +144,10 @@ it.each(['\uFEFF{"servers": {"rea": @}}', '\uFEFF{"setting":\uFEFFtrue}'])(
     );
 
     expect(
-      await inspectClientConfiguration(client, {}, ["rea", "mcp"]),
+      await inspectClientConfiguration(client, {}, ["rea4re", "mcp"]),
     ).toMatchObject({ status: "invalid" });
     expect(
-      await configureClientConfiguration(client, {}, ["rea", "mcp"]),
+      await configureClientConfiguration(client, {}, ["rea4re", "mcp"]),
     ).toEqual({ status: "failed", reason: "readback" });
     expect(
       Buffer.compare(await readFile(configPath), Buffer.from(original)),
@@ -171,7 +171,7 @@ it("preserves BOM-prefixed JSONC values and comments through update and removal"
 
   if (CURRENT_ENTRYPOINT_PATH === undefined)
     throw new Error("test runner entrypoint is unavailable");
-  const firstCommand = ["rea", "mcp"];
+  const firstCommand = ["rea4re", "mcp"];
   const updatedCommand = [process.execPath, CURRENT_ENTRYPOINT_PATH, "mcp"];
   expect(
     await configureClientConfiguration(client, {}, firstCommand),
@@ -216,7 +216,7 @@ it.each(["", "\n  \n", "\uFEFF"])(
       throw new Error("missing Antigravity JSON config");
     await mkdir(dirname(client.configPath), { recursive: true });
     await writeFile(client.configPath, original);
-    const command = ["rea", "mcp"];
+    const command = ["rea4re", "mcp"];
 
     expect(await inspectClientConfiguration(client, {}, command)).toEqual({
       status: "update",

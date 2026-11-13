@@ -120,8 +120,8 @@ describe("release configuration", () => {
           example,
         ).toHaveLength(1);
       for (const block of versionBlocks)
-        expect(new Set(block.match(/rea-agents@[^\s"`]+/gu))).toEqual(
-          new Set([`rea-agents@${packageJson.version}`]),
+        expect(new Set(block.match(/rea4re@[^\s"`]+/gu))).toEqual(
+          new Set([`rea4re@${packageJson.version}`]),
         );
     },
   );
@@ -162,7 +162,7 @@ describe("release configuration", () => {
     };
 
     expect(packageJson).toMatchObject({
-      name: "rea-agents",
+      name: "rea4re",
       mcpName: "io.github.morluto/rea",
     });
     expect(serverJson).toMatchObject({
@@ -210,7 +210,7 @@ describe("plugin manifests", () => {
           {
             source: {
               source: "npm",
-              package: "rea-agents",
+              package: "rea4re",
               version: pkg.version,
             },
           },
@@ -248,7 +248,7 @@ describe("Cursor Marketplace release pin", () => {
       mcpServers: {
         rea: {
           command: "npx",
-          args: ["-y", `rea-agents@${packageJson.version}`, "mcp"],
+          args: ["-y", `rea4re@${packageJson.version}`, "mcp"],
         },
       },
     });
@@ -325,7 +325,7 @@ describe("plugin release pins", () => {
       mcpServers: {
         rea: {
           command: "npx",
-          args: ["-y", `rea-agents@${nextVersion}`, "mcp"],
+          args: ["-y", `rea4re@${nextVersion}`, "mcp"],
         },
       },
     });
@@ -338,7 +338,7 @@ describe("plugin release pins", () => {
           {
             source: {
               source: "npm",
-              package: "rea-agents",
+              package: "rea4re",
               version: nextVersion,
             },
           },

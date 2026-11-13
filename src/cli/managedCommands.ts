@@ -2,6 +2,7 @@ import { projectCliAnalysisResult } from "./projectCliAnalysisResult.js";
 import { z } from "incur";
 
 import { compareManagedMemberPaths } from "../application/managed/ManagedMemberComparisonService.js";
+import { decompileManagedMembersEvidence } from "../application/managed/ManagedDecompilationService.js";
 import { executeManagedNativeBoundaries } from "../application/managed/ManagedNativeVerificationService.js";
 import { importManagedReconstructionEvidence } from "../application/managed/ManagedReconstructionService.js";
 import type { DirectAnalysis } from "../composition/directAnalysis.js";
@@ -19,7 +20,10 @@ import type { Logger } from "pino";
 import type { CliInstance } from "./types.js";
 import { registerProjectManagedApplicationGraph } from "./managedProjectGraphCommand.js";
 import { managedMembersInputSchema } from "../contracts/managed/managedToolContracts.js";
-import { localPathStringSchema } from "../domain/localPath.js";
+import {
+  absoluteLocalPathStringSchema,
+  localPathStringSchema,
+} from "../domain/localPath.js";
 import { withCommandCancellation } from "./commandCancellation.js";
 import { finishAnalysisCommand } from "./finishAnalysisCommand.js";
 import { managedInspectionBudgetShape } from "../domain/managed/managedInspectionLimits.js";
@@ -53,6 +57,7 @@ export const registerManagedCommands = (
   cli: CliInstance,
   logger: Logger,
   runProviderAnalysis: DirectAnalysis["runProviderAnalysis"],
+  environment: Readonly<Record<string, string | undefined>> = process.env,
 ): void => {
   registerInspectManagedArtifact(cli, logger, runProviderAnalysis);
   registerInspectManagedMembers(cli, logger, runProviderAnalysis);
@@ -61,6 +66,7 @@ export const registerManagedCommands = (
   registerImportManagedReconstruction(cli, logger);
   registerVerifyManagedNativeBoundaries(cli, logger);
   registerProjectManagedApplicationGraph(cli, logger);
+  registerDecompileManagedMembers(cli, logger, environment);
 };
 
 const registerInspectManagedArtifact = (
@@ -308,6 +314,65 @@ const registerVerifyManagedNativeBoundaries = (
             },
           ).then(projectCliAnalysisResult);
         }),
+      ),
+  });
+};
+
+const registerDecompileManagedMembers = (
+  cli: CliInstance,
+  logger: Logger,
+  environment: Readonly<Record<string, string | undefined>>,
+): void => {
+  cli.command(CLI_COMMANDS.decompileManagedMembers, {
+    description:
+      "Decompile selected managed members through BYO ILSpy-MCP and return reconstruction Evidence",
+    args: z.object({
+      assemblyPath: absoluteLocalPathStringSchema.describe(
+        "Managed PE executable or assembly path",
+      ),
+      declaringType: z
+        .string()
+        .min(1)
+        .describe("Exact declaring type full name"),
+    }),
+    options: z.object({
+      evidenceBundle: evidenceBundleOption,
+      memberNames: z
+        .array(z.string().min(1))
+        .optional()
+        .describe(
+          "Exact member names to decompile (repeatable); default selects all members of the type",
+        ),
+      outputKind: z
+        .enum(["decompiled-csharp", "decompiled-il"])
+        .default("decompiled-csharp")
+        .describe("Upstream output to join"),
+    }),
+    run: ({ args, options }) =>
+      withCommandCancellation((signal) =>
+        logCliCommand(logger, "decompile-managed-members", () =>
+          runEvidenceInputCommand(
+            "decompile_managed_members",
+            options.evidenceBundle,
+            signal,
+            (lookup) =>
+              decompileManagedMembersEvidence(
+                {
+                  assembly_path: args.assemblyPath,
+                  declaring_type: args.declaringType,
+                  ...(options.memberNames === undefined
+                    ? {}
+                    : { member_names: options.memberNames }),
+                  output_kind: options.outputKind,
+                },
+                lookup,
+                {
+                  ...(signal === undefined ? {} : { signal }),
+                  configPath: environment.REA_ILSPY_MCP_CONFIG,
+                },
+              ),
+          ).then(projectCliAnalysisResult),
+        ),
       ),
   });
 };

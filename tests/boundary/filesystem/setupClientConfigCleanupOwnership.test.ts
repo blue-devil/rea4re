@@ -187,7 +187,7 @@ it("stops uninstall and retains the backup read owner when its close fails", asy
   } as const;
   await writeFile(path, '{"keep":"before setup"}\n');
   expect(
-    await configureClientConfiguration(client, {}, ["rea", "mcp"]),
+    await configureClientConfiguration(client, {}, ["rea4re", "mcp"]),
   ).toMatchObject({ status: "configured" });
   const configured = await readFile(path, "utf8");
   const { closeAttempts, release } = holdReadHandle(
@@ -231,7 +231,7 @@ it("keeps shared-ownership proof when the ownership read completes but its close
     JSON.stringify({ mcpServers: { other: { command: "other" } } }),
   );
   expect(
-    await configureClientConfiguration(client, {}, ["rea", "mcp"]),
+    await configureClientConfiguration(client, {}, ["rea4re", "mcp"]),
   ).toMatchObject({ status: "configured" });
   const state = join(home, ".rea", "state.json");
   await mkdir(dirname(state), { recursive: true });
@@ -280,7 +280,7 @@ it("keeps shared-ownership proof when removal refuses a shadowed duplicate", asy
   await mkdir(dirname(client.configPath), { recursive: true });
   await writeFile(
     client.configPath,
-    '{"mcpServers":{"rea":{"command":"foreign-server","args":[]},"rea":{"command":"rea","args":["mcp"]}}}',
+    '{"mcpServers":{"rea":{"command":"foreign-server","args":[]},"rea":{"command":"rea4re","args":["mcp"]}}}',
   );
   const state = join(home, ".rea", "state.json");
   await mkdir(dirname(state), { recursive: true });
@@ -440,7 +440,7 @@ it("removes a shared registration once and reports that outcome to both clients"
         configPath: shared,
       },
       {},
-      ["rea", "mcp"],
+      ["rea4re", "mcp"],
     ),
   ).toMatchObject({ status: "configured" });
   const host = systemUninstallHost(home, undefined, { HOME: home }, "linux");
@@ -494,7 +494,7 @@ it("keeps one row per client when OpenCode is pointed at FreeBuff's file", async
         configPath: shared,
       },
       {},
-      ["rea", "mcp"],
+      ["rea4re", "mcp"],
     ),
   ).toMatchObject({ status: "configured" });
   const host = systemUninstallHost(
@@ -537,12 +537,12 @@ it.each([true, false])(
         mcp: {
           rea: {
             type: "local",
-            command: [sharedOwned ? "foreign-server" : "rea", "mcp"],
+            command: [sharedOwned ? "foreign-server" : "rea4re", "mcp"],
           },
         },
         mcpServers: {
           rea: {
-            command: sharedOwned ? "rea" : "foreign-server",
+            command: sharedOwned ? "rea4re" : "foreign-server",
             args: ["mcp"],
           },
         },
@@ -607,7 +607,7 @@ it("does not treat a dangling FreeBuff profile link as installed", async () => {
         configPath: cursor,
       },
       {},
-      ["rea", "mcp"],
+      ["rea4re", "mcp"],
     ),
   ).toMatchObject({ status: "configured" });
   lstatMock.mockImplementation((path) =>
@@ -684,7 +684,7 @@ it("serves a completed removal reread when its close retry releases the handle",
       // Another writer registers REA between preflight and removal.
       await writeFile(
         client.configPath,
-        '{"mcpServers":{"rea":{"command":"rea","args":["mcp"]}}}',
+        '{"mcpServers":{"rea":{"command":"rea4re","args":["mcp"]}}}',
       );
       hold();
       return base.inspectSkill?.();
@@ -730,8 +730,8 @@ describe("ZCode fallback cleanup ownership", () => {
       try {
         const action =
           operation === "preflight"
-            ? host.inspectClientConfiguration?.(client, {}, ["rea", "mcp"])
-            : host.configureClient(client, {}, ["rea", "mcp"]);
+            ? host.inspectClientConfiguration?.(client, {}, ["rea4re", "mcp"])
+            : host.configureClient(client, {}, ["rea4re", "mcp"]);
         if (action === undefined) throw new Error("setup preflight missing");
         await expect(action).rejects.toMatchObject({
           _tag: "ConfigurationError",
@@ -775,14 +775,14 @@ describe("setup client configuration cleanup ownership", () => {
           host,
           [client],
           { providerEnvironment: {} },
-          ["rea", "mcp"],
+          ["rea4re", "mcp"],
         )
           .then((detectedClients) =>
             configureDetectedClients({
               host,
               detectedClients,
               providerEnvironment: {},
-              command: ["rea", "mcp"],
+              command: ["rea4re", "mcp"],
               clients: {},
               appliedActions: [],
             }),
@@ -857,7 +857,7 @@ describe("setup client configuration cleanup ownership", () => {
     });
 
     let hostCloseFinished = false;
-    const alignment = host.clientNeedsConfigure(client, {}, ["rea", "mcp"]);
+    const alignment = host.clientNeedsConfigure(client, {}, ["rea4re", "mcp"]);
     let closeResult: ReturnType<NonNullable<typeof host.close>> | undefined;
     await withVerifierCleanup(async () => {
       await awaitAcknowledgement(readStarted, alignment, "configuration read");
@@ -870,7 +870,7 @@ describe("setup client configuration cleanup ownership", () => {
       });
 
       const lateAdmission = await host
-        .clientNeedsConfigure(client, {}, ["rea", "mcp"])
+        .clientNeedsConfigure(client, {}, ["rea4re", "mcp"])
         .then(
           () => undefined,
           (cause: unknown) => cause,
@@ -952,7 +952,7 @@ it.each(
     );
     await mkdir(dirname(config), { recursive: true });
     const registration =
-      '{"mcpServers":{"rea":{"command":"rea","args":["mcp"]}}}\n';
+      '{"mcpServers":{"rea":{"command":"rea4re","args":["mcp"]}}}\n';
     await writeFile(config, registration);
     const heldPath = source === "policy" ? join(home, "system.json") : config;
     const heldText = source === "policy" ? "{}\n" : registration;
@@ -1018,7 +1018,7 @@ it("keeps a supplied registration scope responsible for diagnostics and cleanup 
   await mkdir(dirname(config), { recursive: true });
   await writeFile(
     config,
-    '{"mcpServers":{"rea":{"command":"rea","args":["mcp"]}}}',
+    '{"mcpServers":{"rea":{"command":"rea4re","args":["mcp"]}}}',
   );
   const held = holdReadHandle(config, "held scoped registration descriptor");
   const resources = new ArtifactResourceScope();

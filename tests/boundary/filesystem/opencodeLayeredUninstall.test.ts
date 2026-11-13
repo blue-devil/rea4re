@@ -25,7 +25,7 @@ it.each(["native", "legacy"])(
               servers: {
                 rea: {
                   type: "local",
-                  command: ["rea", "mcp"],
+                  command: ["rea4re", "mcp"],
                   disabled: false,
                 },
               },
@@ -34,7 +34,7 @@ it.each(["native", "legacy"])(
         : {
             mcp: {
               servers: {},
-              rea: { type: "local", command: ["rea", "mcp"], enabled: true },
+              rea: { type: "local", command: ["rea4re", "mcp"], enabled: true },
             },
           },
     );
@@ -93,7 +93,7 @@ it("preflights a foreign legacy registration across OpenCode layers before remov
   const native = JSON.stringify({
     mcp: {
       servers: {
-        rea: { type: "local", command: ["rea", "mcp"], disabled: false },
+        rea: { type: "local", command: ["rea4re", "mcp"], disabled: false },
       },
     },
   });
@@ -157,7 +157,7 @@ it("preflights a foreign legacy registration across OpenCode layers before remov
     JSON.stringify({
       mcp: {
         servers: {},
-        rea: { type: "local", command: ["rea", "mcp"], enabled: true },
+        rea: { type: "local", command: ["rea4re", "mcp"], enabled: true },
       },
     }),
   );

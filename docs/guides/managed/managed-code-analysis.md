@@ -6,7 +6,7 @@ builds, and connect declared native calls to supplied native-analysis evidence.
 CIL is Common Intermediate Language, the instruction format used by managed
 assemblies.
 
-The seven shipped tools are:
+The eight shipped tools are:
 
 | Task                                                                        | MCP tool                            |
 | --------------------------------------------------------------------------- | ----------------------------------- |
@@ -15,16 +15,30 @@ The seven shipped tools are:
 | List declared native calls and native implementation indicators             | `inspect_managed_native_boundaries` |
 | Compare members across builds and map build-local tokens                    | `compare_managed_members`           |
 | Check native call declarations against supplied export or function evidence | `verify_managed_native_boundaries`  |
+| Decompile selected members through a configured ILSpy-MCP server            | `decompile_managed_members`         |
 | Import decompiled code against verified static member identities            | `import_managed_reconstruction`     |
 | Add managed findings to an application graph                                | `project_managed_application_graph` |
 
-Each has a matching CLI command: replace underscores with hyphens and prefix
-the name with `rea`, for example `rea inspect-managed-artifact`.
+Each has a matching CLI command: replace underscores with hyphens,
+for example `rea4re inspect-managed-artifact`.
 Native-body bridge mapping and managed runtime execution are outside the
 current tool set.
 
 The canonical tool inventory is the
 [build-generated catalog](../../reference/mcp-contracts.md#generated-catalog).
+
+## Decompile first
+
+`decompile_managed_members` is the decompilation-first path: it selects members
+from REA's own inventory, decompiles them through a configured ILSpy-MCP
+server, and returns the same hash-locked reconstruction Evidence as the manual
+`import_managed_reconstruction` import — no hand-edited JSON. See the
+[ILSpy-MCP provider guide](../../providers/ilspy-mcp.md) for configuration,
+doctor, the per-member exclusion reasons, and the C#/IL trust model:
+
+```bash
+rea4re decompile-managed-members /absolute/path/Assembly.dll Namespace.Type --json
+```
 
 ## Inspect an assembly
 

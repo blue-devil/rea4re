@@ -1,3 +1,4 @@
+import { PRODUCT_IDENTITY } from "../../identity.js";
 import { isPortableBundleName } from "../../domain/portableBundleName.js";
 import { describe, expect, it } from "vitest";
 
@@ -125,30 +126,30 @@ describe("planEnvironmentBundle", () => {
       "RUN apt-get update && apt-get install -y --no-install-recommends python3 && rm -rf /var/lib/apt/lists/*",
     );
     expect(lines).toContain(
-      `RUN npm install -g --ignore-scripts --no-fund --no-audit rea-agents@${PACKAGE_METADATA.version}`,
+      `RUN npm install -g --ignore-scripts --no-fund --no-audit rea4re@${PACKAGE_METADATA.version}`,
     );
     expect(lines).toContain(
       "COPY --chown=node:node manifest.json evidence.json /env/",
     );
     expect(lines).toContain("USER node");
     expect(lines.at(-1)).toBe(
-      'CMD ["rea","environment-serve","/env/manifest.json","--evidence","/env/evidence.json"]',
+      'CMD ["rea4re","environment-serve","/env/manifest.json","--evidence","/env/evidence.json"]',
     );
-    expect(dockerfile).not.toContain("rea-agents.tgz");
+    expect(dockerfile).not.toContain("rea4re.tgz");
     expect(dockerfile.indexOf("RUN npm install")).toBeLessThan(
       dockerfile.indexOf("USER node"),
     );
   });
 
   it("copies and installs the tarball instead of the registry package when one is given", () => {
-    const planned = plan({ tarball: "/packed/rea-agents-1.2.3.tgz" });
-    expect(planned.copies.tarball).toBe("envs/grafana-example/rea-agents.tgz");
+    const planned = plan({ tarball: "/packed/rea4re-1.2.3.tgz" });
+    expect(planned.copies.tarball).toBe("envs/grafana-example/rea4re.tgz");
     const dockerfile = file(planned, "envs/grafana-example/Dockerfile");
-    expect(dockerfile).toContain("COPY rea-agents.tgz /tmp/\n");
+    expect(dockerfile).toContain("COPY rea4re.tgz /tmp/\n");
     expect(dockerfile).toContain(
-      "RUN npm install -g --ignore-scripts --no-fund --no-audit /tmp/rea-agents.tgz && rm /tmp/rea-agents.tgz\n",
+      "RUN npm install -g --ignore-scripts --no-fund --no-audit /tmp/rea4re.tgz && rm /tmp/rea4re.tgz\n",
     );
-    expect(dockerfile).not.toContain(`rea-agents@${PACKAGE_METADATA.version}`);
+    expect(dockerfile).not.toContain(`rea4re@${PACKAGE_METADATA.version}`);
     expect(bundleDockerfile(registryPackageSource())).not.toBe(dockerfile);
   });
 
@@ -217,7 +218,7 @@ describe("planEnvironmentBundle", () => {
     expect(readme).toContain(
       `- State: \`${served.state?.evidenceId ?? ""}\`, derived from the capture`,
     );
-    expect(readme).toContain(`rea-agents@${PACKAGE_METADATA.version}`);
+    expect(readme).toContain(`rea4re@${PACKAGE_METADATA.version}`);
     expect(readme).toContain("```sh\nagent-env run .\n```");
     expect(readme).not.toContain("agent-env run grafana-example");
     expect(readme).toContain("## What the environment serves");
@@ -226,7 +227,7 @@ describe("planEnvironmentBundle", () => {
       "write tools are served only where the capture's later reads confirmed\ntheir effect",
     );
     expect(readme).toContain(
-      "`rea environment-serve --replay-only` serves pure replay",
+      `\`${PRODUCT_IDENTITY.cliBinary} environment-serve --replay-only\` serves pure replay`,
     );
     expect(readme).toContain("This bundle serves from the state");
     expect(readme).toContain("serves 14 of the manifest's\n19 tools");

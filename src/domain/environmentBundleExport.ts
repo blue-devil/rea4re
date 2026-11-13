@@ -6,6 +6,7 @@ import { prefixedDigestSchema } from "./digests.js";
 import { retainedEvidenceReferenceSchema } from "./evidenceReference.js";
 import { absoluteLocalPathStringSchema } from "./localPath.js";
 import { portableBundleNameSchema } from "./portableBundleName.js";
+import { PRODUCT_IDENTITY } from "../identity.js";
 
 /** A durably published bundle retained when later cleanup fails. */
 export interface EnvironmentBundlePublication {
@@ -48,7 +49,7 @@ export const exportEnvironmentBundleInputSchema = z.strictObject({
   package_tarball: absoluteLocalPathStringSchema
     .optional()
     .describe(
-      "Absolute path of a packed rea-agents tarball the bundle installs instead of the registry package of this version.",
+      `Absolute path of a packed ${PRODUCT_IDENTITY.packageName} tarball the bundle installs instead of the registry package of this version.`,
     ),
   dry_run: z
     .boolean()

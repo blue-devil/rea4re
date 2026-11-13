@@ -186,7 +186,7 @@ cliTest(
     });
 
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain("Usage: rea setup");
+    expect(result.stdout).toContain("Usage: rea4re setup");
     expect(result.stdout).not.toContain("Invalid --dry-run value");
     await expect(access(config)).rejects.toMatchObject({ code: "ENOENT" });
   },
@@ -475,13 +475,13 @@ describe("interactive setup journey", () => {
           ...actions[0],
           operation: "update",
           backupPath: "/isolated/.codex/config.toml.bak",
-          commands: ["npx -y rea-agents@3.2.1 mcp"],
+          commands: ["npx -y rea4re@3.2.1 mcp"],
         },
         actions[1],
       ],
     );
     expect(result.output).toContain("/isolated/.codex/config.toml.bak");
-    expect(result.output).toContain("command: npx -y rea-agents@3.2.1 mcp");
+    expect(result.output).toContain("command: npx -y rea4re@3.2.1 mcp");
     expect(result.output.indexOf("command:")).toBeLessThan(
       result.output.indexOf("Apply these 2 changes?"),
     );
@@ -565,16 +565,16 @@ describe("interactive setup journey", () => {
 
 describe("interactive setup completion", () => {
   it.each([
-    { npmCommand: "", userAgent: "", launcher: "rea" },
+    { npmCommand: "", userAgent: "", launcher: "rea4re" },
     {
       npmCommand: "exec",
       userAgent: "npm/10.9.0 node/v24.11.0 linux x64",
-      launcher: "npx rea-agents",
+      launcher: "npx rea4re",
     },
     {
       npmCommand: "exec",
       userAgent: "bun/1.4.2 npm/? node/v26.3.0 linux x64",
-      launcher: "bunx rea-agents",
+      launcher: "bunx rea4re",
     },
   ])(
     "prints an available next command for $launcher invocation",

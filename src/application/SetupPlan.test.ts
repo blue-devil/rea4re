@@ -100,7 +100,7 @@ it.skipIf(process.platform === "win32")(
 it.each([
   {
     settings: { startup_timeout_sec: 0 },
-    launcher: { command: "rea", args: ["mcp"] },
+    launcher: { command: "rea4re", args: ["mcp"] },
     state: "invalid",
     identity: "owned",
     status: "invalid",
